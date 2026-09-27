@@ -1,0 +1,14 @@
+{
+  "name": "Pantry Math",
+  "short_name": "Pantry Math",
+  "description": "Scan products and calculate cooked recipe portions.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f2eee4",
+  "theme_color": "#174b3a",
+  "icons": [
+    { "src": "./pantry-math-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
+
