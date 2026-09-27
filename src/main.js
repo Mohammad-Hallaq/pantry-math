@@ -1,6 +1,6 @@
 import './style.css';
 import { BrowserMultiFormatReader } from '@zxing/browser';
-import { NUTRIENTS, EMPTY_NUTRITION, calculateNutritionForWeight, sumNutrition, calculateNutritionPer100g, calculatePortionNutrition, formatNutrition, isValidNutrition } from './nutrition.js';
+import { NUTRIENTS, EMPTY_NUTRITION, calculateNutritionForWeight, sumNutrition, calculateNutritionPer100g, calculatePortionNutrition, formatNutrition, isValidNutrition, roundToTwo } from './nutrition.js';
 import { getProducts, saveProduct, getProductByBarcode, productNutrition, getRecipes, saveRecipe, deleteRecipe } from './storage.js';
 
 const $ = (selector) => document.querySelector(selector);
@@ -30,7 +30,7 @@ function setStatus(message = '', tone = 'info') {
 }
 
 function nutritionInputs(container, nutrition = EMPTY_NUTRITION) {
-  container.innerHTML = NUTRIENTS.map((key) => `<label>${nutrientLabels[key]}<span><input id="product-${key}" data-nutrient="${key}" type="number" min="0" step="0.01" value="${nutrition[key] ?? 0}"><b>${key === 'calories' ? 'kcal' : 'g'}</b></span></label>`).join('');
+  container.innerHTML = NUTRIENTS.map((key) => `<label>${nutrientLabels[key]}<span><input id="product-${key}" data-nutrient="${key}" data-round type="number" min="0" step="any" value="${nutrition[key] ?? 0}"><b>${key === 'calories' ? 'kcal' : 'g'}</b></span></label>`).join('');
 }
 
 function showProduct(product) {
@@ -102,7 +102,7 @@ function macroMarkup(nutrition) {
 
 function renderRecipe() {
   const products = getProducts();
-  $('#ingredients-list').innerHTML = activeRecipe.ingredients.length ? activeRecipe.ingredients.map((ingredient) => `<div class="ingredient-row" data-ingredient="${ingredient.id}"><div><strong>${escapeHtml(ingredient.productName)}</strong><small>${formatNutrition(ingredient.nutritionPer100g.calories, 'calories')} kcal / 100 g</small></div><label>Weight used<div class="mini-unit"><input class="ingredient-weight" type="number" min="0" step="0.1" inputmode="decimal" value="${ingredient.weightG || ''}"><b>g</b></div></label><div class="ingredient-energy"><strong>${formatNutrition(calculateNutritionForWeight(ingredient.nutritionPer100g, ingredient.weightG).calories, 'calories')}</strong><small>kcal</small></div><button class="remove-ingredient icon-button" aria-label="Remove ${escapeHtml(ingredient.productName)}">×</button></div>`).join('') : `<div class="empty-state">Add every ingredient you expect to consume, including oils and small additions.${products.length ? '' : ' Save a product first or create one manually.'}</div>`;
+  $('#ingredients-list').innerHTML = activeRecipe.ingredients.length ? activeRecipe.ingredients.map((ingredient) => `<div class="ingredient-row" data-ingredient="${ingredient.id}"><div><strong>${escapeHtml(ingredient.productName)}</strong><small>${formatNutrition(ingredient.nutritionPer100g.calories, 'calories')} kcal / 100 g</small></div><label>Weight used<div class="mini-unit"><input class="ingredient-weight" data-round type="number" min="0" step="any" inputmode="decimal" value="${ingredient.weightG || ''}"><b>g</b></div></label><div class="ingredient-energy"><strong>${formatNutrition(calculateNutritionForWeight(ingredient.nutritionPer100g, ingredient.weightG).calories, 'calories')}</strong><small>kcal</small></div><button class="remove-ingredient icon-button" aria-label="Remove ${escapeHtml(ingredient.productName)}">×</button></div>`).join('') : `<div class="empty-state">Add every ingredient you expect to consume, including oils and small additions.${products.length ? '' : ' Save a product first or create one manually.'}</div>`;
   updateCalculations();
 }
 
@@ -135,7 +135,8 @@ function saveActiveRecipe() {
   if (!activeRecipe.ingredients.length) { $('#recipe-status').textContent = 'Add at least one ingredient.'; return; }
   if (activeRecipe.ingredients.some((item) => !Number.isFinite(Number(item.weightG)) || Number(item.weightG) < 0 || !isValidNutrition(item.nutritionPer100g))) { $('#recipe-status').textContent = 'Check ingredient weights and nutrition values.'; return; }
   if (cooked !== '' && (!Number.isFinite(Number(cooked)) || Number(cooked) <= 0)) { $('#recipe-status').textContent = 'Cooked weight must be greater than 0.'; return; }
-  activeRecipe = { ...activeRecipe, name, cookedWeightG: cooked === '' ? '' : Number(cooked), updatedAt: new Date().toISOString() };
+  activeRecipe.ingredients.forEach((ingredient) => { ingredient.weightG = roundToTwo(ingredient.weightG); });
+  activeRecipe = { ...activeRecipe, name, cookedWeightG: cooked === '' ? '' : roundToTwo(cooked), updatedAt: new Date().toISOString() };
   saveRecipe(activeRecipe); $('#recipe-status').textContent = 'Recipe saved locally.';
 }
 
@@ -146,7 +147,7 @@ document.querySelectorAll('.nav-button').forEach((button) => button.addEventList
 $('#lookup-form').addEventListener('submit', (event) => { event.preventDefault(); lookupBarcode($('#barcode').value); });
 $('#manual-product').addEventListener('click', newManualProduct);
 $('#new-search').addEventListener('click', () => { $('#product-card').hidden = true; setStatus(); $('#barcode').value = ''; });
-$('#nutrition-form').addEventListener('submit', (event) => { event.preventDefault(); const name = $('#product-name-input').value.trim(); const nutrition = Object.fromEntries(NUTRIENTS.map((key) => [key, Number($(`[data-nutrient="${key}"]`).value)])); if (!name || !isValidNutrition(nutrition)) { setStatus('Enter a name and valid non-negative nutrition values.', 'error'); return; } activeProduct = saveProduct({ ...activeProduct, name, nutritionPer100g: nutrition, source: 'Saved locally' }); $('#source').textContent = activeProduct.source; setStatus('Product saved and ready for recipes.', 'success'); renderProducts(); });
+$('#nutrition-form').addEventListener('submit', (event) => { event.preventDefault(); const name = $('#product-name-input').value.trim(); const nutrition = Object.fromEntries(NUTRIENTS.map((key) => [key, roundToTwo($(`[data-nutrient="${key}"]`).value)])); if (!name || !isValidNutrition(nutrition)) { setStatus('Enter a name and valid non-negative nutrition values.', 'error'); return; } activeProduct = saveProduct({ ...activeProduct, name, nutritionPer100g: nutrition, source: 'Saved locally' }); $('#source').textContent = activeProduct.source; nutritionInputs($('#product-nutrients'), nutrition); setStatus('Product saved and ready for recipes.', 'success'); renderProducts(); });
 $('#products-list').addEventListener('click', (event) => { const card = event.target.closest('[data-product]'); if (card) showProduct(getProducts().find((product) => product.id === card.dataset.product)); });
 $('#open-camera').addEventListener('click', async () => { setStatus(); $('#open-camera').hidden = true; $('#scanner').hidden = false; try { const reader = new BrowserMultiFormatReader(); scannerControls = await reader.decodeFromVideoDevice(undefined, $('#scanner-video'), (result) => { if (result && isValidBarcode(result.getText())) { stopScanner(); lookupBarcode(result.getText()); } }); } catch (error) { stopScanner(); setStatus(error?.name === 'NotAllowedError' ? 'Camera permission was denied. Type the barcode instead.' : 'The camera could not start. Type the barcode instead.', 'error'); } });
 $('#close-camera').addEventListener('click', stopScanner);
@@ -159,6 +160,7 @@ $('#ingredient-scan').addEventListener('click', () => setView('products')); $('#
 $('#ingredients-list').addEventListener('input', (event) => { if (!event.target.classList.contains('ingredient-weight')) return; const ingredient = activeRecipe.ingredients.find((item) => item.id === event.target.closest('.ingredient-row').dataset.ingredient); ingredient.weightG = event.target.value; updateCalculations(); });
 $('#ingredients-list').addEventListener('click', (event) => { if (!event.target.classList.contains('remove-ingredient')) return; activeRecipe.ingredients = activeRecipe.ingredients.filter((item) => item.id !== event.target.closest('.ingredient-row').dataset.ingredient); renderRecipe(); });
 $('#cooked-weight').addEventListener('input', updateCalculations); $('#portion-weight').addEventListener('input', updateCalculations); $('#save-recipe').addEventListener('click', saveActiveRecipe);
+document.addEventListener('focusout', (event) => { if (!event.target.matches('input[data-round]') || event.target.value === '') return; event.target.value = roundToTwo(event.target.value); event.target.dispatchEvent(new Event('input', { bubbles: true })); });
 $('#duplicate-recipe').addEventListener('click', () => { const now = new Date().toISOString(); activeRecipe = { ...structuredClone(activeRecipe), id: crypto.randomUUID(), name: `${$('#recipe-name').value || activeRecipe.name} (copy)`, createdAt: now, updatedAt: now }; $('#recipe-name').value = activeRecipe.name; $('#recipe-status').textContent = 'Copy created. Save when ready.'; });
 $('#delete-recipe').addEventListener('click', () => { if (activeRecipe && confirm(`Delete “${activeRecipe.name || 'this recipe'}”?`)) { deleteRecipe(activeRecipe.id); closeRecipeEditor(); } });
 
