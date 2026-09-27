@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateNutritionForWeight, sumNutrition, calculateNutritionPer100g, calculatePortionNutrition } from '../src/nutrition.js';
+import { calculateNutritionForWeight, sumNutrition, calculateNutritionPer100g, calculatePortionNutrition, roundToTwo } from '../src/nutrition.js';
 
 const nutrition = (calories) => ({ calories, protein: 0, carbs: 0, fat: 0, fiber: 0, salt: 0 });
 
@@ -25,5 +25,10 @@ test('handles zero, invalid and decimal weights safely', () => {
   assert.equal(calculateNutritionPer100g(nutrition(100), 0).calories, 0);
   assert.equal(calculatePortionNutrition(nutrition(100), 100, 101).calories, 0);
   assert.equal(calculateNutritionForWeight(nutrition(100), -1).calories, 0);
+});
+
+test('rounds entered values to two decimal places', () => {
+  assert.equal(roundToTwo(12.333333334), 12.33);
+  assert.equal(roundToTwo(12.335), 12.34);
 });
 
