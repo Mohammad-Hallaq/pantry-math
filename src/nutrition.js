@@ -1,6 +1,12 @@
 export const NUTRIENTS = ['calories', 'protein', 'carbs', 'fat', 'fiber', 'salt'];
 export const EMPTY_NUTRITION = Object.freeze({ calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, salt: 0 });
 
+export function roundToTwo(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 0;
+  return Math.round((number + Number.EPSILON) * 100) / 100;
+}
+
 export function normalizeNutrition(value = {}) {
   return Object.fromEntries(NUTRIENTS.map((key) => {
     const number = Number(value[key] ?? 0);
