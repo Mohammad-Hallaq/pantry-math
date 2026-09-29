@@ -1,7 +1,7 @@
 import './style.css';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { NUTRIENTS, EMPTY_NUTRITION, calculateNutritionForWeight, sumNutrition, calculateNutritionPer100g, calculatePortionNutrition, formatNutrition, isValidNutrition, roundToTwo } from './nutrition.js';
-import { getProducts, saveProduct, getProductByBarcode, productNutrition, getRecipes, saveRecipe, deleteRecipe, getDailyLog, saveDailyLog } from './storage.js';
+import { getProducts, saveProduct, getProductByBarcode, productNutrition, getRecipes, saveRecipe, deleteRecipe, getDailyLog, saveDailyLog, getAllDailyLogs, getMonthlyArchives, saveMonthlyArchive, undoMonthlyArchive, createBackupData, restoreBackupData } from './storage.js';
 
 const $ = (selector) => document.querySelector(selector);
 const nutrientLabels = { calories: 'Calories', protein: 'Protein', carbs: 'Carbs', fat: 'Fat', fiber: 'Fiber', salt: 'Salt' };
@@ -11,6 +11,7 @@ let activeRecipe;
 let activeDayLog;
 let addingMealId = null;
 let editingMealId = null;
+let selectedArchiveMonth = null;
 
 export const cleanBarcode = (value) => String(value).replace(/\D/g, '');
 export const isValidBarcode = (value) => /^\d{8,14}$/.test(cleanBarcode(value));
@@ -26,7 +27,8 @@ function setView(view) {
   document.querySelectorAll('.nav-button').forEach((button) => button.classList.toggle('active', button.dataset.view === view));
   if (view === 'products') renderProducts();
   else if (view === 'recipes') renderRecipes();
-  else renderDailyLog();
+  else if (view === 'today') renderDailyLog();
+  else renderHistory();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -194,6 +196,7 @@ function renderDailyLog() {
     }).join('') : '<p class="meal-empty">Nothing logged yet.</p>';
     return `<section class="meal-card" data-meal-id="${meal.id}"><header><div><p class="kicker">Meal</p><h2>${escapeHtml(meal.name)}</h2><strong>${formatNutrition(total.calories, 'calories')} kcal</strong></div><div class="meal-actions"><button class="rename-meal secondary" aria-label="Rename ${escapeHtml(meal.name)}">Rename</button><button class="delete-meal icon-button" aria-label="Delete ${escapeHtml(meal.name)}">×</button><button class="add-daily-food primary">+ Add food</button></div></header>${rows}</section>`;
   }).join('') : '<div class="empty-state meals-empty"><strong>No meals yet.</strong><br>Create your first meal and name it however you like.</div>';
+  updateArchiveReminder();
 }
 
 function renderFoodChoices(query = '') {
@@ -232,6 +235,82 @@ function openMealDialog(meal = null) {
   $('#meal-name').value = meal?.name ?? '';
   $('#meal-dialog').showModal();
   requestAnimationFrame(() => $('#meal-name').focus());
+}
+
+function previousMonthKey() {
+  const date = new Date();
+  date.setDate(1); date.setMonth(date.getMonth() - 1);
+  return localDateKey(date).slice(0, 7);
+}
+
+function divideNutrition(nutrition, divisor) {
+  if (!divisor) return { ...EMPTY_NUTRITION };
+  return Object.fromEntries(NUTRIENTS.map((key) => [key, nutrition[key] / divisor]));
+}
+
+function buildMonthlyArchive(month) {
+  const sourceLogs = Object.fromEntries(Object.entries(getAllDailyLogs()).filter(([date, log]) => date.startsWith(`${month}-`) && log.items?.length));
+  const dailyTotals = Object.entries(sourceLogs).sort(([a], [b]) => a.localeCompare(b)).map(([date, rawLog]) => {
+    const log = normalizeDailyLog(structuredClone(rawLog));
+    return { date, nutrition: sumNutrition(log.items.map(dailyItemNutrition)) };
+  });
+  const totals = sumNutrition(dailyTotals.map((day) => day.nutrition));
+  const [year, monthNumber] = month.split('-').map(Number);
+  const calendarDays = new Date(year, monthNumber, 0).getDate();
+  const foodCounts = {};
+  Object.values(sourceLogs).flatMap((log) => log.items ?? []).forEach((item) => {
+    const key = `${item.sourceType}:${item.name}`;
+    foodCounts[key] ??= { name: item.name, sourceType: item.sourceType, timesLogged: 0, totalWeightG: 0 };
+    foodCounts[key].timesLogged += 1; foodCounts[key].totalWeightG += Number(item.weightG) || 0;
+  });
+  return {
+    month, createdAt: new Date().toISOString(), trackedDays: dailyTotals.length, calendarDays, totals,
+    averageTrackedDay: divideNutrition(totals, dailyTotals.length), averageCalendarDay: divideNutrition(totals, calendarDays), dailyTotals,
+    topFoods: Object.values(foodCounts).sort((a, b) => b.timesLogged - a.timesLogged).slice(0, 8)
+  };
+}
+
+function downloadBackup() {
+  const data = createBackupData();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob); const link = document.createElement('a');
+  link.href = url; link.download = `pantry-math-backup-${localDateKey()}.json`; link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function calorieChart(archive) {
+  const width = 720; const height = 250; const pad = 38;
+  const values = Array.from({ length: archive.calendarDays }, (_, index) => archive.dailyTotals.find((day) => Number(day.date.slice(-2)) === index + 1)?.nutrition.calories ?? 0);
+  const max = Math.max(...values, 1); const x = (index) => pad + index * (width - pad * 2) / Math.max(values.length - 1, 1); const y = (value) => height - pad - value / max * (height - pad * 2);
+  const points = values.map((value, index) => `${x(index)},${y(value)}`).join(' ');
+  const dots = values.map((value, index) => value ? `<circle cx="${x(index)}" cy="${y(value)}" r="4"><title>Day ${index + 1}: ${Math.round(value)} kcal</title></circle>` : '').join('');
+  return `<svg class="calorie-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Daily calorie plot"><line x1="${pad}" y1="${height - pad}" x2="${width - pad}" y2="${height - pad}"/><line x1="${pad}" y1="${pad}" x2="${pad}" y2="${height - pad}"/><text x="${pad - 8}" y="${pad + 4}" text-anchor="end">${Math.round(max)}</text><text x="${pad - 8}" y="${height - pad + 4}" text-anchor="end">0</text><text x="${pad}" y="${height - 12}">1</text><text x="${width - pad}" y="${height - 12}" text-anchor="end">${values.length}</text><polyline points="${points}"/>${dots}</svg>`;
+}
+
+function renderArchiveDetail(archive) {
+  if (!archive) { $('#archive-detail').innerHTML = '<div class="empty-state">Close a completed month to see its results here.</div>'; return; }
+  const title = new Date(`${archive.month}-01T12:00:00`).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const days = archive.dailyTotals.map((day) => `<div><span>${new Date(`${day.date}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span><strong>${formatNutrition(day.nutrition.calories, 'calories')} kcal</strong></div>`).join('');
+  const foods = archive.topFoods?.map((food) => `<li><span>${escapeHtml(food.name)} <small>${food.sourceType}</small></span><strong>${food.timesLogged}×</strong></li>`).join('') || '<li>No food breakdown available.</li>';
+  $('#archive-detail').innerHTML = `<header><div><p class="kicker">Monthly archive</p><h2>${title}</h2><p>${archive.trackedDays} of ${archive.calendarDays} days tracked</p></div>${archive.sourceLogs ? '<button id="undo-archive" class="secondary">Undo close</button>' : ''}</header><div class="archive-totals">${macroMarkup(archive.totals)}</div><div class="averages"><div><span>Average per tracked day</span><strong>${formatNutrition(archive.averageTrackedDay.calories, 'calories')} kcal</strong></div><div><span>Average across calendar month</span><strong>${formatNutrition(archive.averageCalendarDay.calories, 'calories')} kcal</strong></div></div><section class="plot-card"><h3>Daily calories</h3>${calorieChart(archive)}</section><div class="archive-columns"><section><h3>Daily totals</h3><div class="daily-history">${days}</div></section><section><h3>Most logged foods</h3><ol class="top-foods">${foods}</ol></section></div>`;
+}
+
+function renderHistory() {
+  const archives = getMonthlyArchives();
+  $('#archive-month').max = previousMonthKey();
+  if (!$('#archive-month').value) $('#archive-month').value = previousMonthKey();
+  if (!selectedArchiveMonth && archives.length) selectedArchiveMonth = archives[0].month;
+  $('#archive-list').innerHTML = archives.length ? archives.map((archive) => { const title = new Date(`${archive.month}-01T12:00:00`).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }); return `<button data-archive="${archive.month}" class="archive-card ${archive.month === selectedArchiveMonth ? 'active' : ''}"><span>${title}</span><strong>${formatNutrition(archive.totals.calories, 'calories')} kcal</strong><small>${archive.trackedDays} days tracked</small></button>`; }).join('') : '<div class="empty-state">No closed months yet.</div>';
+  renderArchiveDetail(archives.find((archive) => archive.month === selectedArchiveMonth));
+}
+
+function updateArchiveReminder() {
+  const archived = new Set(getMonthlyArchives().map((item) => item.month));
+  const currentMonth = localDateKey().slice(0, 7);
+  const available = Object.entries(getAllDailyLogs()).filter(([date, log]) => date.slice(0, 7) < currentMonth && log.items?.length).map(([date]) => date.slice(0, 7)).sort()[0];
+  const reminder = $('#archive-reminder');
+  reminder.hidden = !available || archived.has(available);
+  if (!reminder.hidden) { const title = new Date(`${available}-01T12:00:00`).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }); reminder.textContent = `${title} is complete — review and close the month →`; reminder.dataset.month = available; }
 }
 
 function stopScanner() { scannerControls?.stop(); scannerControls = undefined; $('#scanner').hidden = true; $('#open-camera').hidden = false; }
@@ -287,8 +366,39 @@ $('#meal-form').addEventListener('submit', (event) => {
   else activeDayLog.meals.push({ id: crypto.randomUUID(), name });
   saveDailyLog(activeDayLog); $('#meal-dialog').close(); renderDailyLog();
 });
+$('#archive-reminder').addEventListener('click', (event) => { setView('history'); $('#archive-month').value = event.currentTarget.dataset.month; });
+$('#export-backup').addEventListener('click', downloadBackup);
+$('#import-backup').addEventListener('click', () => $('#backup-file').click());
+$('#backup-file').addEventListener('change', async (event) => {
+  const file = event.target.files[0]; if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (!confirm('Restore this backup? Current Pantry Math data on this device will be replaced.')) return;
+    restoreBackupData(data); activeDayLog = null; activeRecipe = null; selectedArchiveMonth = null;
+    renderProducts(); renderRecipes(); setLogDate(localDateKey()); renderHistory();
+    $('#archive-status').textContent = 'Backup restored successfully.';
+  } catch (error) { $('#archive-status').textContent = error.message || 'The backup could not be restored.'; }
+  event.target.value = '';
+});
+$('#close-month').addEventListener('click', () => {
+  const month = $('#archive-month').value; const status = $('#archive-status'); status.textContent = '';
+  if (!month || month > previousMonthKey()) { status.textContent = 'Choose a completed month.'; return; }
+  if (getMonthlyArchives().some((archive) => archive.month === month)) { status.textContent = 'That month is already archived.'; return; }
+  const archive = buildMonthlyArchive(month);
+  if (!archive.trackedDays) { status.textContent = 'There are no logged days in that month.'; return; }
+  downloadBackup();
+  if (!confirm(`Your backup has been downloaded. Close ${month} and remove its detailed meal entries?`)) { status.textContent = 'Month closing cancelled; no history was removed.'; return; }
+  const sourceLogs = Object.fromEntries(Object.entries(getAllDailyLogs()).filter(([date, log]) => date.startsWith(`${month}-`) && log.items?.length));
+  saveMonthlyArchive(archive, sourceLogs); selectedArchiveMonth = month; activeDayLog = null; renderHistory(); updateArchiveReminder();
+  status.textContent = 'Month closed and archived successfully.';
+});
+$('#archive-list').addEventListener('click', (event) => { const card = event.target.closest('[data-archive]'); if (card) { selectedArchiveMonth = card.dataset.archive; renderHistory(); } });
+$('#archive-detail').addEventListener('click', (event) => {
+  if (event.target.id !== 'undo-archive') return;
+  if (confirm('Restore the detailed daily records for this month and remove its archive?')) { undoMonthlyArchive(selectedArchiveMonth); selectedArchiveMonth = null; renderHistory(); updateArchiveReminder(); }
+});
 
-renderProducts(); renderRecipes(); setLogDate(localDateKey());
+renderProducts(); renderRecipes(); setLogDate(localDateKey()); renderHistory();
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
