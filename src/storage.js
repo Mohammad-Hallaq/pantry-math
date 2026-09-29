@@ -2,6 +2,7 @@ import { NUTRIENTS, normalizeNutrition } from './nutrition.js';
 
 const PRODUCTS_KEY = 'pantry-math:products';
 const RECIPES_KEY = 'pantry-math:recipes';
+const DAILY_LOGS_KEY = 'pantry-math:daily-logs';
 
 function read(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
@@ -50,5 +51,17 @@ export function saveRecipe(recipe) {
 
 export function deleteRecipe(id) {
   localStorage.setItem(RECIPES_KEY, JSON.stringify(getRecipes().filter((recipe) => recipe.id !== id)));
+}
+
+export function getDailyLog(date) {
+  const logs = read(DAILY_LOGS_KEY, {});
+  return logs[date] ?? { date, items: [] };
+}
+
+export function saveDailyLog(log) {
+  const logs = read(DAILY_LOGS_KEY, {});
+  logs[log.date] = log;
+  localStorage.setItem(DAILY_LOGS_KEY, JSON.stringify(logs));
+  return log;
 }
 
