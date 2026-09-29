@@ -32,3 +32,9 @@ test('rounds entered values to two decimal places', () => {
   assert.equal(roundToTwo(12.335), 12.34);
 });
 
+test('sums product and cooked-recipe portions for a daily log', () => {
+  const fruit = calculateNutritionForWeight(nutrition(100), 150);
+  const cookedRecipe = calculateNutritionForWeight(nutrition(200), 250);
+  assert.equal(sumNutrition([fruit, cookedRecipe]).calories, 650);
+});
+
