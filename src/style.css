@@ -203,6 +203,48 @@ dialog::backdrop { background:#10231dd9; backdrop-filter:blur(3px); }
 .daily-item .mini-unit input { font-size:16px; }
 .meal-empty { margin:20px 0 0; color:var(--muted); font-size:13px; text-align:center; }
 .selection-list button:disabled { cursor:not-allowed; opacity:.5; }
+.archive-reminder { width:100%; margin:0 0 16px; padding:14px 18px; border:1px solid #c59b2c; background:#fff1bd; color:#624b0d; font-weight:600; text-align:left; }
+
+/* Backup and monthly history */
+.data-tools,.close-month { display:grid; grid-template-columns:1fr auto; gap:30px; align-items:center; padding:28px; border:1px solid var(--line); background:var(--paper); }
+.data-tools p,.close-month p { max-width:620px; margin-bottom:0; color:var(--muted); line-height:1.5; }
+.data-tools h2,.close-month h2 { margin:0 0 8px; }
+.data-actions { display:flex; gap:8px; }
+.close-month { margin-top:16px; }
+.close-month>div:last-child { min-width:240px; }
+.close-month label { color:var(--muted); font:500 10px 'DM Mono'; letter-spacing:.1em; text-transform:uppercase; }
+.close-month input { width:100%; height:44px; margin:6px 0 8px; padding:0 10px; border:1px solid var(--line); background:white; }
+.close-month .primary { width:100%; }
+.history-layout { display:grid; grid-template-columns:280px minmax(0,1fr); gap:16px; margin-top:30px; align-items:start; }
+.archive-list { display:flex; flex-direction:column; gap:8px; }
+.archive-card { padding:16px; display:flex; flex-direction:column; align-items:flex-start; gap:4px; border:1px solid var(--line); background:var(--paper); color:var(--ink); text-align:left; }
+.archive-card.active { border-color:var(--green); box-shadow:4px 4px var(--lime); }
+.archive-card span { font-weight:600; }
+.archive-card strong { font:500 18px 'DM Mono'; }
+.archive-card small { color:var(--muted); }
+.archive-detail { min-width:0; padding:28px; border:1px solid var(--line); background:var(--paper); }
+.archive-detail>header { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; }
+.archive-detail>header h2 { margin:0 0 4px; font-size:30px; }
+.archive-detail>header p:last-child { color:var(--muted); }
+.archive-totals { margin-top:20px; }
+.averages { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
+.averages>div { padding:17px; border:1px solid var(--line); }
+.averages span { display:block; color:var(--muted); font-size:11px; }
+.averages strong { display:block; margin-top:6px; font:500 22px 'DM Mono'; }
+.plot-card { margin-top:22px; padding-top:20px; border-top:1px solid var(--line); }
+.calorie-chart { width:100%; height:auto; overflow:visible; }
+.calorie-chart line { stroke:#b9b8af; stroke-width:1; }
+.calorie-chart polyline { fill:none; stroke:var(--orange); stroke-width:3; stroke-linejoin:round; stroke-linecap:round; }
+.calorie-chart circle { fill:var(--green); stroke:var(--paper); stroke-width:2; }
+.calorie-chart text { fill:var(--muted); font:11px 'DM Mono'; }
+.archive-columns { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-top:20px; }
+.daily-history { max-height:320px; overflow:auto; }
+.daily-history>div { padding:10px 0; display:flex; justify-content:space-between; border-bottom:1px solid var(--line); }
+.top-foods { margin:0; padding-left:20px; }
+.top-foods li { padding:10px 0 10px 4px; border-bottom:1px solid var(--line); }
+.top-foods li span { display:flex; flex-direction:column; }
+.top-foods li strong { float:right; margin-top:-28px; }
+.top-foods small { color:var(--muted); }
 
 @media(max-width:900px){.recipe-results{grid-template-columns:1fr 1fr}.portion-block{grid-column:1/-1}.result-block:nth-child(2){border-right:0}.card-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:760px){.shell{width:min(100% - 24px,620px)}.topbar>p{display:none}.hero{padding:52px 0 35px}.hero>div{display:block}.lede{margin-top:30px}.lookup-card{grid-template-columns:1fr;box-shadow:5px 5px #dbe4b8}.lookup-main{padding:27px 21px}aside{padding:27px 21px;border-left:0;border-top:1px solid var(--line)}aside ol{display:grid;grid-template-columns:repeat(3,1fr);padding-bottom:8px}aside li{align-items:flex-start}aside li small{display:none}.product-head{grid-template-columns:70px 1fr;padding:21px}.source{grid-column:1/-1;justify-self:start}#image-wrap,#product-image{width:70px;height:70px}#nutrition-form{padding:21px}.nutrition-title{display:block}.nutrition-title>p{margin-top:12px}.nutrients{grid-template-columns:repeat(2,1fr)}}
@@ -211,4 +253,6 @@ dialog::backdrop { background:#10231dd9; backdrop-filter:blur(3px); }
 @media(max-width:700px){.topbar{height:72px}.topbar nav{gap:0}.nav-button{padding:8px 10px}.hero.compact{padding-top:42px}.card-grid{grid-template-columns:1fr}.section-heading-row{align-items:center}.section-heading-row h2{font-size:25px}.editor-top{align-items:flex-start}.editor-actions{flex-direction:column}.recipe-name-wrap,.recipe-panel,.breakdown{padding:20px}.ingredient-row{grid-template-columns:1fr 120px 30px;gap:12px}.ingredient-energy{display:none}.recipe-results{grid-template-columns:1fr}.result-block{border-right:0;border-bottom:1px solid var(--line)}.result-block:last-child{border-bottom:0}.portion-block{grid-column:auto}.sticky-save{bottom:6px}.dialog-actions{flex-direction:column}.macro strong{font-size:19px}}
 
 @media(max-width:700px){.brand{font-size:0}.brand span{font-size:11px}.daily-summary{grid-template-columns:1fr;padding:22px}.daily-summary .macro-grid{grid-template-columns:repeat(3,1fr)}#meal-sections{grid-template-columns:1fr}.meal-card{padding:18px}.meal-card>header{align-items:flex-start;flex-direction:column}.meal-actions{width:100%}.meal-actions .add-daily-food{margin-left:auto}.day-toolbar{position:sticky;top:0;z-index:4;gap:6px;padding:12px}.day-toolbar .secondary{display:none}.day-toolbar input{max-width:150px}.daily-item{grid-template-columns:minmax(120px,1fr) 95px 30px}.add-daily-food{min-height:40px;padding:0 12px}}
+@media(max-width:800px){.data-tools,.close-month{grid-template-columns:1fr;padding:21px}.data-actions{flex-direction:column}.history-layout{grid-template-columns:1fr}.archive-list{display:grid;grid-template-columns:repeat(2,1fr)}.archive-detail{padding:20px}.archive-columns{grid-template-columns:1fr}.topbar nav{overflow-x:auto;max-width:calc(100vw - 70px)}.nav-button{white-space:nowrap}}
+@media(max-width:480px){.archive-list,.averages{grid-template-columns:1fr}.archive-detail .macro-grid{grid-template-columns:repeat(2,1fr)}}
 
