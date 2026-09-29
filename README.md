@@ -19,7 +19,9 @@ Open the address printed by Vite. Camera access works on `localhost`; access fro
 - Editable nutrition values per 100 g
 - Verified values saved in local storage
 - Daily meal log using saved products or cooked recipes
-- Breakfast, lunch, dinner, and snack sections with daily macro totals
+- Custom named meals for each day
+- Full JSON backup and restore
+- Monthly closing with compact daily archives, averages, and calorie trend plots
 
 Open Food Facts is community-maintained, so check values against the product packaging before saving.
 
