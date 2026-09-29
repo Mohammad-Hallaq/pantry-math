@@ -1,13 +1,16 @@
 import './style.css';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { NUTRIENTS, EMPTY_NUTRITION, calculateNutritionForWeight, sumNutrition, calculateNutritionPer100g, calculatePortionNutrition, formatNutrition, isValidNutrition, roundToTwo } from './nutrition.js';
-import { getProducts, saveProduct, getProductByBarcode, productNutrition, getRecipes, saveRecipe, deleteRecipe } from './storage.js';
+import { getProducts, saveProduct, getProductByBarcode, productNutrition, getRecipes, saveRecipe, deleteRecipe, getDailyLog, saveDailyLog } from './storage.js';
 
 const $ = (selector) => document.querySelector(selector);
 const nutrientLabels = { calories: 'Calories', protein: 'Protein', carbs: 'Carbs', fat: 'Fat', fiber: 'Fiber', salt: 'Salt' };
 let scannerControls;
 let activeProduct;
 let activeRecipe;
+let activeDayLog;
+let addingMeal = 'Breakfast';
+const mealNames = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
 
 export const cleanBarcode = (value) => String(value).replace(/\D/g, '');
 export const isValidBarcode = (value) => /^\d{8,14}$/.test(cleanBarcode(value));
@@ -21,7 +24,9 @@ function setView(view) {
   stopScanner();
   document.querySelectorAll('.view').forEach((element) => { element.hidden = element.id !== `${view}-view`; });
   document.querySelectorAll('.nav-button').forEach((button) => button.classList.toggle('active', button.dataset.view === view));
-  if (view === 'products') renderProducts(); else renderRecipes();
+  if (view === 'products') renderProducts();
+  else if (view === 'recipes') renderRecipes();
+  else renderDailyLog();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -140,6 +145,74 @@ function saveActiveRecipe() {
   saveRecipe(activeRecipe); $('#recipe-status').textContent = 'Recipe saved locally.';
 }
 
+function localDateKey(date = new Date()) {
+  const offset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+}
+
+function setLogDate(date) {
+  $('#log-date').value = date;
+  activeDayLog = getDailyLog(date);
+  renderDailyLog();
+}
+
+function dailyItemNutrition(item) {
+  return calculateNutritionForWeight(item.nutritionPer100g, item.weightG);
+}
+
+function dailyTotal() {
+  return sumNutrition((activeDayLog?.items ?? []).map(dailyItemNutrition));
+}
+
+function renderDailyLog() {
+  const date = $('#log-date').value || localDateKey();
+  if (!activeDayLog || activeDayLog.date !== date) activeDayLog = getDailyLog(date);
+  $('#log-date').value = date;
+  const isToday = date === localDateKey();
+  const displayDate = new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+  $('#day-heading').textContent = isToday ? `Today · ${displayDate}` : displayDate;
+  $('#daily-totals').innerHTML = macroMarkup(dailyTotal());
+  $('#meal-sections').innerHTML = mealNames.map((meal) => {
+    const items = activeDayLog.items.filter((item) => item.meal === meal);
+    const total = sumNutrition(items.map(dailyItemNutrition));
+    const rows = items.length ? items.map((item) => {
+      const n = dailyItemNutrition(item);
+      return `<div class="daily-item" data-daily-item="${item.id}"><div><span class="card-kicker">${item.sourceType}</span><strong>${escapeHtml(item.name)}</strong><small>${formatNutrition(n.calories, 'calories')} kcal · ${formatNutrition(n.protein, 'protein')} g protein</small></div><label>Amount<div class="mini-unit"><input class="daily-weight" data-round type="number" min="0" step="any" inputmode="decimal" value="${item.weightG || ''}"><b>g</b></div></label><button class="remove-daily-item icon-button" aria-label="Remove ${escapeHtml(item.name)}">×</button></div>`;
+    }).join('') : '<p class="meal-empty">Nothing logged yet.</p>';
+    return `<section class="meal-card" data-meal="${meal}"><header><div><p class="kicker">${meal}</p><strong>${formatNutrition(total.calories, 'calories')} kcal</strong></div><button class="add-daily-food primary" data-meal="${meal}">+ Add food</button></header>${rows}</section>`;
+  }).join('');
+}
+
+function renderFoodChoices(query = '') {
+  const search = query.trim().toLowerCase();
+  const products = getProducts().filter((product) => product.name.toLowerCase().includes(search)).map((product) => ({ id: product.id, name: product.name, type: 'Product', nutritionPer100g: productNutrition(product), available: true }));
+  const recipes = getRecipes().filter((recipe) => recipe.name.toLowerCase().includes(search)).map((recipe) => ({ id: recipe.id, name: recipe.name, type: 'Recipe', nutritionPer100g: recipe.cookedWeightG > 0 ? calculateNutritionPer100g(recipeTotal(recipe), recipe.cookedWeightG) : EMPTY_NUTRITION, available: recipe.cookedWeightG > 0 }));
+  const choices = [...recipes, ...products];
+  $('#food-choices').innerHTML = choices.length ? choices.map((choice) => `<button type="button" data-food-id="${choice.id}" data-food-type="${choice.type}" ${choice.available ? '' : 'disabled'}><span><strong>${escapeHtml(choice.name)}</strong><small>${choice.type}${choice.available ? ` · ${formatNutrition(choice.nutritionPer100g.calories, 'calories')} kcal / 100 g` : ' · Add cooked weight first'}</small></span><b>${choice.available ? '+' : '!'}</b></button>`).join('') : '<p class="empty-state small">No matching saved foods.</p>';
+}
+
+function addFoodToDay(sourceId, sourceType) {
+  let source;
+  if (sourceType === 'Recipe') {
+    const recipe = getRecipes().find((item) => item.id === sourceId);
+    if (!recipe?.cookedWeightG) return;
+    source = { name: recipe.name, nutritionPer100g: calculateNutritionPer100g(recipeTotal(recipe), recipe.cookedWeightG) };
+  } else {
+    const product = getProducts().find((item) => item.id === sourceId);
+    if (!product) return;
+    source = { name: product.name, nutritionPer100g: productNutrition(product) };
+  }
+  activeDayLog.items.push({ id: crypto.randomUUID(), sourceId, sourceType, name: source.name, nutritionPer100g: source.nutritionPer100g, weightG: '', meal: addingMeal });
+  saveDailyLog(activeDayLog); $('#food-dialog').close(); renderDailyLog();
+  requestAnimationFrame(() => $(`[data-daily-item]:last-of-type .daily-weight`)?.focus());
+}
+
+function shiftLogDate(days) {
+  const date = new Date(`${$('#log-date').value}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  setLogDate(localDateKey(date));
+}
+
 function stopScanner() { scannerControls?.stop(); scannerControls = undefined; $('#scanner').hidden = true; $('#open-camera').hidden = false; }
 function escapeHtml(value) { const div = document.createElement('div'); div.textContent = value ?? ''; return div.innerHTML; }
 
@@ -164,7 +237,25 @@ document.addEventListener('focusout', (event) => { if (!event.target.matches('in
 $('#duplicate-recipe').addEventListener('click', () => { const now = new Date().toISOString(); activeRecipe = { ...structuredClone(activeRecipe), id: crypto.randomUUID(), name: `${$('#recipe-name').value || activeRecipe.name} (copy)`, createdAt: now, updatedAt: now }; $('#recipe-name').value = activeRecipe.name; $('#recipe-status').textContent = 'Copy created. Save when ready.'; });
 $('#delete-recipe').addEventListener('click', () => { if (activeRecipe && confirm(`Delete “${activeRecipe.name || 'this recipe'}”?`)) { deleteRecipe(activeRecipe.id); closeRecipeEditor(); } });
 
-renderProducts(); renderRecipes();
+$('#meal-sections').addEventListener('click', (event) => {
+  const add = event.target.closest('.add-daily-food');
+  if (add) { addingMeal = add.dataset.meal; $('#food-search').value = ''; renderFoodChoices(); $('#food-dialog').showModal(); return; }
+  const remove = event.target.closest('.remove-daily-item');
+  if (remove) { const id = remove.closest('[data-daily-item]').dataset.dailyItem; activeDayLog.items = activeDayLog.items.filter((item) => item.id !== id); saveDailyLog(activeDayLog); renderDailyLog(); }
+});
+$('#meal-sections').addEventListener('change', (event) => {
+  if (!event.target.classList.contains('daily-weight')) return;
+  const item = activeDayLog.items.find((entry) => entry.id === event.target.closest('[data-daily-item]').dataset.dailyItem);
+  item.weightG = roundToTwo(event.target.value); saveDailyLog(activeDayLog); renderDailyLog();
+});
+$('#food-search').addEventListener('input', (event) => renderFoodChoices(event.target.value));
+$('#food-choices').addEventListener('click', (event) => { const choice = event.target.closest('[data-food-id]'); if (choice && !choice.disabled) addFoodToDay(choice.dataset.foodId, choice.dataset.foodType); });
+$('#log-date').addEventListener('change', (event) => setLogDate(event.target.value));
+$('#previous-day').addEventListener('click', () => shiftLogDate(-1));
+$('#next-day').addEventListener('click', () => shiftLogDate(1));
+$('#today-button').addEventListener('click', () => setLogDate(localDateKey()));
+
+renderProducts(); renderRecipes(); setLogDate(localDateKey());
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
