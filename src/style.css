@@ -171,9 +171,36 @@ dialog::backdrop { background:#10231dd9; backdrop-filter:blur(3px); }
 .dialog-divider { margin:22px 0 12px; color:var(--muted); font-size:12px; }
 .dialog-actions { display:flex; gap:8px; }
 
+/* Daily meal log */
+.day-toolbar { display:flex; align-items:end; justify-content:center; gap:10px; margin-bottom:18px; padding:18px; border:1px solid var(--line); background:var(--paper); }
+.day-toolbar label { color:var(--muted); font:500 10px 'DM Mono'; letter-spacing:.1em; text-transform:uppercase; }
+.day-toolbar input { display:block; height:42px; margin-top:5px; padding:0 12px; border:1px solid var(--line); background:white; color:var(--ink); font:14px 'DM Mono'; }
+.day-arrow { width:42px; height:42px; border:1px solid var(--line); background:transparent; color:var(--ink); font-size:20px; }
+.daily-summary { display:grid; grid-template-columns:minmax(200px,.7fr) 1.3fr; gap:28px; align-items:center; padding:28px; border:1px solid var(--line); background:var(--green); color:white; }
+.daily-summary h2 { margin:0; font-size:28px; }
+.daily-summary .kicker { color:var(--lime); margin-bottom:8px; }
+.daily-summary .macro-grid { border-color:#3b695b; background:#3b695b; }
+.daily-summary .macro { background:#245746; color:white; }
+.daily-summary .macro span,.daily-summary .macro small { color:#bed0c9; }
+#meal-sections { display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-top:16px; }
+.meal-card { min-width:0; padding:24px; border:1px solid var(--line); background:var(--paper); }
+.meal-card>header { display:flex; align-items:center; justify-content:space-between; gap:18px; padding-bottom:17px; border-bottom:1px solid var(--line); }
+.meal-card>header .kicker { margin-bottom:5px; }
+.meal-card>header strong { font:500 18px 'DM Mono'; }
+.daily-item { display:grid; grid-template-columns:minmax(130px,1fr) 105px 34px; gap:14px; align-items:center; padding:15px 0; border-bottom:1px solid var(--line); }
+.daily-item>div:first-child { min-width:0; display:flex; flex-direction:column; gap:4px; }
+.daily-item>div:first-child strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.daily-item small { color:var(--muted); font-size:11px; }
+.daily-item label { color:var(--muted); font-size:10px; }
+.daily-item .mini-unit input { font-size:16px; }
+.meal-empty { margin:20px 0 0; color:var(--muted); font-size:13px; text-align:center; }
+.selection-list button:disabled { cursor:not-allowed; opacity:.5; }
+
 @media(max-width:900px){.recipe-results{grid-template-columns:1fr 1fr}.portion-block{grid-column:1/-1}.result-block:nth-child(2){border-right:0}.card-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:760px){.shell{width:min(100% - 24px,620px)}.topbar>p{display:none}.hero{padding:52px 0 35px}.hero>div{display:block}.lede{margin-top:30px}.lookup-card{grid-template-columns:1fr;box-shadow:5px 5px #dbe4b8}.lookup-main{padding:27px 21px}aside{padding:27px 21px;border-left:0;border-top:1px solid var(--line)}aside ol{display:grid;grid-template-columns:repeat(3,1fr);padding-bottom:8px}aside li{align-items:flex-start}aside li small{display:none}.product-head{grid-template-columns:70px 1fr;padding:21px}.source{grid-column:1/-1;justify-self:start}#image-wrap,#product-image{width:70px;height:70px}#nutrition-form{padding:21px}.nutrition-title{display:block}.nutrition-title>p{margin-top:12px}.nutrients{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:430px){h1{font-size:51px}.barcode-row{grid-template-columns:1fr}.barcode-row button{height:48px}aside ol{grid-template-columns:1fr}aside li{padding:7px 0}aside li small{display:block}}
 
 @media(max-width:700px){.topbar{height:72px}.topbar nav{gap:0}.nav-button{padding:8px 10px}.hero.compact{padding-top:42px}.card-grid{grid-template-columns:1fr}.section-heading-row{align-items:center}.section-heading-row h2{font-size:25px}.editor-top{align-items:flex-start}.editor-actions{flex-direction:column}.recipe-name-wrap,.recipe-panel,.breakdown{padding:20px}.ingredient-row{grid-template-columns:1fr 120px 30px;gap:12px}.ingredient-energy{display:none}.recipe-results{grid-template-columns:1fr}.result-block{border-right:0;border-bottom:1px solid var(--line)}.result-block:last-child{border-bottom:0}.portion-block{grid-column:auto}.sticky-save{bottom:6px}.dialog-actions{flex-direction:column}.macro strong{font-size:19px}}
+
+@media(max-width:700px){.brand{font-size:0}.brand span{font-size:11px}.daily-summary{grid-template-columns:1fr;padding:22px}.daily-summary .macro-grid{grid-template-columns:repeat(3,1fr)}#meal-sections{grid-template-columns:1fr}.meal-card{padding:18px}.day-toolbar{position:sticky;top:0;z-index:4;gap:6px;padding:12px}.day-toolbar .secondary{display:none}.day-toolbar input{max-width:150px}.daily-item{grid-template-columns:minmax(120px,1fr) 95px 30px}.add-daily-food{min-height:40px;padding:0 12px}}
 
