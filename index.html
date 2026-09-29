@@ -5,7 +5,7 @@
   <meta name="description" content="Scan products, calculate cooked recipes, and log daily meals."><link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./pantry-math-icon.svg" type="image/svg+xml"><title>Pantry Math</title>
 </head>
 <body><main class="shell">
-  <header class="topbar"><a class="brand" href="#"><span>PM</span> Pantry Math</a><nav><button class="nav-button active" data-view="products">Products</button><button class="nav-button" data-view="recipes">Recipes</button><button class="nav-button" data-view="today">Today</button></nav></header>
+  <header class="topbar"><a class="brand" href="#"><span>PM</span> Pantry Math</a><nav><button class="nav-button active" data-view="products">Products</button><button class="nav-button" data-view="recipes">Recipes</button><button class="nav-button" data-view="today">Today</button><button class="nav-button" data-view="history">History</button></nav></header>
 
   <section id="products-view" class="view">
     <section class="hero compact"><p class="kicker">Your ingredient library</p><div><h1>Scan it.<br><em>Check it.</em> Cook.</h1><p class="lede">Scan packaged ingredients or create foods manually. Every saved product can be used in a recipe.</p></div></section>
@@ -25,8 +25,15 @@
 
   <section id="today-view" class="view" hidden>
     <section class="hero compact today-hero"><p class="kicker">Your daily food log</p><div><h1>Eat.<br><em>Log.</em> Know.</h1><p class="lede">Record portions from saved recipes and individual foods, then see the nutrition for your whole day.</p></div></section>
-    <section class="day-toolbar"><button id="previous-day" class="day-arrow" aria-label="Previous day">←</button><label for="log-date">Day<input id="log-date" type="date"></label><button id="next-day" class="day-arrow" aria-label="Next day">→</button><button id="today-button" class="secondary">Today</button></section>
+    <section class="day-toolbar"><button id="previous-day" class="day-arrow" aria-label="Previous day">←</button><label for="log-date">Day<input id="log-date" type="date"></label><button id="next-day" class="day-arrow" aria-label="Next day">→</button><button id="today-button" class="secondary">Today</button></section><button id="archive-reminder" class="archive-reminder" hidden></button>
     <section class="daily-summary"><div><p class="kicker">Daily total</p><h2 id="day-heading">Today</h2></div><div id="daily-totals" class="macro-grid"></div></section><div class="meal-list-heading"><div><p class="kicker">Meals</p><h2>Your meals</h2></div><button id="add-meal" class="primary">+ Add meal</button></div><div id="meal-sections"></div>
+  </section>
+
+  <section id="history-view" class="view" hidden>
+    <section class="hero compact"><p class="kicker">Long-term view</p><div><h1>Month by<br><em>month.</em></h1><p class="lede">Close completed months, preserve daily totals, and keep secure backup files you control.</p></div></section>
+    <section class="data-tools"><div><p class="kicker">Your data</p><h2>Backup and restore</h2><p>Download everything in Pantry Math, including products, recipes, daily logs, and monthly archives.</p></div><div class="data-actions"><button id="export-backup" class="primary">Download backup</button><button id="import-backup" class="secondary">Restore backup</button><input id="backup-file" type="file" accept="application/json,.json" hidden></div></section>
+    <section class="close-month"><div><p class="kicker">Completed month</p><h2>Close and archive</h2><p>A backup downloads first. Detailed meals are then replaced with compact daily totals after confirmation.</p></div><div><label for="archive-month">Month<input id="archive-month" type="month"></label><button id="close-month" class="primary">Close month</button><p id="archive-status" class="inline-error"></p></div></section>
+    <section class="history-layout"><div><div class="section-heading-row"><div><p class="kicker">Saved summaries</p><h2>Monthly history</h2></div></div><div id="archive-list" class="archive-list"></div></div><section id="archive-detail" class="archive-detail"><div class="empty-state">Close a completed month to see its results here.</div></section></section>
   </section>
 </main>
 
