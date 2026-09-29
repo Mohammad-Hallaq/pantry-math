@@ -9,8 +9,8 @@ let scannerControls;
 let activeProduct;
 let activeRecipe;
 let activeDayLog;
-let addingMeal = 'Breakfast';
-const mealNames = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
+let addingMealId = null;
+let editingMealId = null;
 
 export const cleanBarcode = (value) => String(value).replace(/\D/g, '');
 export const isValidBarcode = (value) => /^\d{8,14}$/.test(cleanBarcode(value));
@@ -152,8 +152,21 @@ function localDateKey(date = new Date()) {
 
 function setLogDate(date) {
   $('#log-date').value = date;
-  activeDayLog = getDailyLog(date);
+  activeDayLog = normalizeDailyLog(getDailyLog(date));
   renderDailyLog();
+}
+
+function normalizeDailyLog(log) {
+  if (Array.isArray(log.meals)) return log;
+  const names = [...new Set(log.items.map((item) => item.meal).filter(Boolean))];
+  log.meals = names.map((name) => ({ id: crypto.randomUUID(), name }));
+  log.items.forEach((item) => {
+    const meal = log.meals.find((entry) => entry.name === item.meal);
+    item.mealId = meal?.id ?? null;
+    delete item.meal;
+  });
+  saveDailyLog(log);
+  return log;
 }
 
 function dailyItemNutrition(item) {
@@ -166,21 +179,21 @@ function dailyTotal() {
 
 function renderDailyLog() {
   const date = $('#log-date').value || localDateKey();
-  if (!activeDayLog || activeDayLog.date !== date) activeDayLog = getDailyLog(date);
+  if (!activeDayLog || activeDayLog.date !== date) activeDayLog = normalizeDailyLog(getDailyLog(date));
   $('#log-date').value = date;
   const isToday = date === localDateKey();
   const displayDate = new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
   $('#day-heading').textContent = isToday ? `Today · ${displayDate}` : displayDate;
   $('#daily-totals').innerHTML = macroMarkup(dailyTotal());
-  $('#meal-sections').innerHTML = mealNames.map((meal) => {
-    const items = activeDayLog.items.filter((item) => item.meal === meal);
+  $('#meal-sections').innerHTML = activeDayLog.meals.length ? activeDayLog.meals.map((meal) => {
+    const items = activeDayLog.items.filter((item) => item.mealId === meal.id);
     const total = sumNutrition(items.map(dailyItemNutrition));
     const rows = items.length ? items.map((item) => {
       const n = dailyItemNutrition(item);
       return `<div class="daily-item" data-daily-item="${item.id}"><div><span class="card-kicker">${item.sourceType}</span><strong>${escapeHtml(item.name)}</strong><small>${formatNutrition(n.calories, 'calories')} kcal · ${formatNutrition(n.protein, 'protein')} g protein</small></div><label>Amount<div class="mini-unit"><input class="daily-weight" data-round type="number" min="0" step="any" inputmode="decimal" value="${item.weightG || ''}"><b>g</b></div></label><button class="remove-daily-item icon-button" aria-label="Remove ${escapeHtml(item.name)}">×</button></div>`;
     }).join('') : '<p class="meal-empty">Nothing logged yet.</p>';
-    return `<section class="meal-card" data-meal="${meal}"><header><div><p class="kicker">${meal}</p><strong>${formatNutrition(total.calories, 'calories')} kcal</strong></div><button class="add-daily-food primary" data-meal="${meal}">+ Add food</button></header>${rows}</section>`;
-  }).join('');
+    return `<section class="meal-card" data-meal-id="${meal.id}"><header><div><p class="kicker">Meal</p><h2>${escapeHtml(meal.name)}</h2><strong>${formatNutrition(total.calories, 'calories')} kcal</strong></div><div class="meal-actions"><button class="rename-meal secondary" aria-label="Rename ${escapeHtml(meal.name)}">Rename</button><button class="delete-meal icon-button" aria-label="Delete ${escapeHtml(meal.name)}">×</button><button class="add-daily-food primary">+ Add food</button></div></header>${rows}</section>`;
+  }).join('') : '<div class="empty-state meals-empty"><strong>No meals yet.</strong><br>Create your first meal and name it however you like.</div>';
 }
 
 function renderFoodChoices(query = '') {
@@ -202,7 +215,7 @@ function addFoodToDay(sourceId, sourceType) {
     if (!product) return;
     source = { name: product.name, nutritionPer100g: productNutrition(product) };
   }
-  activeDayLog.items.push({ id: crypto.randomUUID(), sourceId, sourceType, name: source.name, nutritionPer100g: source.nutritionPer100g, weightG: '', meal: addingMeal });
+  activeDayLog.items.push({ id: crypto.randomUUID(), sourceId, sourceType, name: source.name, nutritionPer100g: source.nutritionPer100g, weightG: '', mealId: addingMealId });
   saveDailyLog(activeDayLog); $('#food-dialog').close(); renderDailyLog();
   requestAnimationFrame(() => $(`[data-daily-item]:last-of-type .daily-weight`)?.focus());
 }
@@ -211,6 +224,14 @@ function shiftLogDate(days) {
   const date = new Date(`${$('#log-date').value}T12:00:00`);
   date.setDate(date.getDate() + days);
   setLogDate(localDateKey(date));
+}
+
+function openMealDialog(meal = null) {
+  editingMealId = meal?.id ?? null;
+  $('#meal-dialog-title').textContent = meal ? 'Rename meal' : 'Add a meal';
+  $('#meal-name').value = meal?.name ?? '';
+  $('#meal-dialog').showModal();
+  requestAnimationFrame(() => $('#meal-name').focus());
 }
 
 function stopScanner() { scannerControls?.stop(); scannerControls = undefined; $('#scanner').hidden = true; $('#open-camera').hidden = false; }
@@ -239,7 +260,11 @@ $('#delete-recipe').addEventListener('click', () => { if (activeRecipe && confir
 
 $('#meal-sections').addEventListener('click', (event) => {
   const add = event.target.closest('.add-daily-food');
-  if (add) { addingMeal = add.dataset.meal; $('#food-search').value = ''; renderFoodChoices(); $('#food-dialog').showModal(); return; }
+  if (add) { addingMealId = add.closest('[data-meal-id]').dataset.mealId; $('#food-search').value = ''; renderFoodChoices(); $('#food-dialog').showModal(); return; }
+  const rename = event.target.closest('.rename-meal');
+  if (rename) { const meal = activeDayLog.meals.find((entry) => entry.id === rename.closest('[data-meal-id]').dataset.mealId); openMealDialog(meal); return; }
+  const deleteButton = event.target.closest('.delete-meal');
+  if (deleteButton) { const mealId = deleteButton.closest('[data-meal-id]').dataset.mealId; const meal = activeDayLog.meals.find((entry) => entry.id === mealId); if (confirm(`Delete “${meal.name}” and everything logged in it?`)) { activeDayLog.meals = activeDayLog.meals.filter((entry) => entry.id !== mealId); activeDayLog.items = activeDayLog.items.filter((item) => item.mealId !== mealId); saveDailyLog(activeDayLog); renderDailyLog(); } return; }
   const remove = event.target.closest('.remove-daily-item');
   if (remove) { const id = remove.closest('[data-daily-item]').dataset.dailyItem; activeDayLog.items = activeDayLog.items.filter((item) => item.id !== id); saveDailyLog(activeDayLog); renderDailyLog(); }
 });
@@ -254,6 +279,14 @@ $('#log-date').addEventListener('change', (event) => setLogDate(event.target.val
 $('#previous-day').addEventListener('click', () => shiftLogDate(-1));
 $('#next-day').addEventListener('click', () => shiftLogDate(1));
 $('#today-button').addEventListener('click', () => setLogDate(localDateKey()));
+$('#add-meal').addEventListener('click', () => openMealDialog());
+$('#close-meal-dialog').addEventListener('click', () => $('#meal-dialog').close());
+$('#meal-form').addEventListener('submit', (event) => {
+  event.preventDefault(); const name = $('#meal-name').value.trim(); if (!name) return;
+  if (editingMealId) activeDayLog.meals.find((meal) => meal.id === editingMealId).name = name;
+  else activeDayLog.meals.push({ id: crypto.randomUUID(), name });
+  saveDailyLog(activeDayLog); $('#meal-dialog').close(); renderDailyLog();
+});
 
 renderProducts(); renderRecipes(); setLogDate(localDateKey());
 
