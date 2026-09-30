@@ -1,6 +1,6 @@
 import './style.css';
 import { BrowserMultiFormatReader } from '@zxing/browser';
-import { NUTRIENTS, EMPTY_NUTRITION, calculateNutritionForWeight, sumNutrition, calculateNutritionPer100g, calculatePortionNutrition, formatNutrition, isValidNutrition, normalizeNutrition, roundToTwo } from './nutrition.js';
+import { NUTRIENTS, EMPTY_NUTRITION, calculateNutritionForWeight, sumNutrition, calculateNutritionPer100g, calculatePortionNutrition, calculateNetWeight, formatNutrition, isValidNutrition, normalizeNutrition, roundToTwo } from './nutrition.js';
 import { getProducts, saveProduct, getProductByBarcode, productNutrition, getRecipes, saveRecipe, deleteRecipe, getDailyLog, saveDailyLog, getAllDailyLogs, getMonthlyArchives, saveMonthlyArchive, undoMonthlyArchive, createBackupData, restoreBackupData } from './storage.js';
 
 const $ = (selector) => document.querySelector(selector);
@@ -89,6 +89,8 @@ function newRecipe() {
 function openRecipeEditor() {
   $('#recipes-home').hidden = true; $('#recipe-editor').hidden = false;
   $('#recipe-name').value = activeRecipe.name; $('#cooked-weight').value = activeRecipe.cookedWeightG || ''; $('#portion-weight').value = '';
+  $('#cooking-container').value = activeRecipe.weighingContainer || 'none'; $('#gross-cooked-weight').value = activeRecipe.grossCookedWeightG || '';
+  setCookingWeightMode(false);
   $('#recipe-status').textContent = ''; renderRecipe();
 }
 
@@ -119,12 +121,37 @@ function updateCalculations() {
   const total = recipeTotal(); $('#recipe-totals').innerHTML = macroMarkup(total);
   const cooked = Number($('#cooked-weight').value); const portion = Number($('#portion-weight').value);
   const cookedValid = Number.isFinite(cooked) && cooked > 0;
-  $('#cooked-error').textContent = $('#cooked-weight').value && !cookedValid ? 'Cooked weight must be greater than 0.' : '';
+  const invalidContainerReading = $('#cooking-container').value !== 'none' && $('#gross-cooked-weight').value !== '' && !cookedValid;
+  $('#cooked-error').textContent = invalidContainerReading ? 'The scale reading must be greater than the container weight.' : $('#cooked-weight').value && !cookedValid ? 'Cooked weight must be greater than 0.' : '';
   $('#cooked-totals').innerHTML = macroMarkup(cookedValid ? calculateNutritionPer100g(total, cooked) : EMPTY_NUTRITION);
   const portionValid = cookedValid && Number.isFinite(portion) && portion > 0 && portion <= cooked;
   $('#portion-error').textContent = !$('#portion-weight').value ? '' : !cookedValid ? 'Enter the final cooked weight first.' : portion <= 0 ? 'Portion weight must be greater than 0.' : portion > cooked ? 'Portion cannot be greater than the cooked batch.' : '';
   $('#portion-totals').innerHTML = macroMarkup(portionValid ? calculatePortionNutrition(total, cooked, portion) : EMPTY_NUTRITION);
   $('#breakdown-body').innerHTML = activeRecipe.ingredients.map((ingredient) => { const n = calculateNutritionForWeight(ingredient.nutritionPer100g, ingredient.weightG); return `<tr><td>${escapeHtml(ingredient.productName)}</td><td>${Number(ingredient.weightG) || 0} g</td><td>${formatNutrition(n.calories, 'calories')} kcal</td><td>${formatNutrition(n.protein, 'protein')} g</td><td>${formatNutrition(n.carbs, 'carbs')} g</td><td>${formatNutrition(n.fat, 'fat')} g</td></tr>`; }).join('');
+}
+
+function selectedContainerWeight() {
+  return Number($('#cooking-container').selectedOptions[0]?.dataset.weight || 0);
+}
+
+function setCookingWeightMode(preserveNet = true) {
+  const usesContainer = $('#cooking-container').value !== 'none';
+  const currentNet = Number($('#cooked-weight').value);
+  $('#net-weight-entry').hidden = usesContainer; $('#gross-weight-entry').hidden = !usesContainer;
+  if (usesContainer && preserveNet && !$('#gross-cooked-weight').value && currentNet > 0) $('#gross-cooked-weight').value = roundToTwo(currentNet + selectedContainerWeight());
+  $('#weight-help').textContent = usesContainer ? `The selected container weighs ${selectedContainerWeight()} g and is subtracted automatically.` : 'Enter the edible food weight after cooking.';
+  updateCookingWeight();
+}
+
+function updateCookingWeight() {
+  if ($('#cooking-container').value !== 'none') {
+    const gross = $('#gross-cooked-weight').value;
+    const net = gross === '' ? 0 : calculateNetWeight(gross, selectedContainerWeight());
+    $('#cooked-weight').value = net || '';
+    $('#calculated-net-weight').textContent = `${net || 0} g`;
+    $('#cooked-error').textContent = gross !== '' && !net ? 'The scale reading must be greater than the container weight.' : '';
+  }
+  updateCalculations();
 }
 
 function addProductToRecipe(product) {
@@ -142,9 +169,10 @@ function saveActiveRecipe() {
   if (!name) { $('#recipe-status').textContent = 'Give the recipe a name before saving.'; $('#recipe-name').focus(); return; }
   if (!activeRecipe.ingredients.length) { $('#recipe-status').textContent = 'Add at least one ingredient.'; return; }
   if (activeRecipe.ingredients.some((item) => !Number.isFinite(Number(item.weightG)) || Number(item.weightG) < 0 || !isValidNutrition(item.nutritionPer100g))) { $('#recipe-status').textContent = 'Check ingredient weights and nutrition values.'; return; }
+  if ($('#cooking-container').value !== 'none' && $('#gross-cooked-weight').value !== '' && !calculateNetWeight($('#gross-cooked-weight').value, selectedContainerWeight())) { $('#recipe-status').textContent = 'The scale reading must be greater than the selected container weight.'; return; }
   if (cooked !== '' && (!Number.isFinite(Number(cooked)) || Number(cooked) <= 0)) { $('#recipe-status').textContent = 'Cooked weight must be greater than 0.'; return; }
   activeRecipe.ingredients.forEach((ingredient) => { ingredient.weightG = roundToTwo(ingredient.weightG); });
-  activeRecipe = { ...activeRecipe, name, cookedWeightG: cooked === '' ? '' : roundToTwo(cooked), updatedAt: new Date().toISOString() };
+  activeRecipe = { ...activeRecipe, name, cookedWeightG: cooked === '' ? '' : roundToTwo(cooked), weighingContainer: $('#cooking-container').value, grossCookedWeightG: $('#cooking-container').value === 'none' || $('#gross-cooked-weight').value === '' ? '' : roundToTwo($('#gross-cooked-weight').value), updatedAt: new Date().toISOString() };
   saveRecipe(activeRecipe); $('#recipe-status').textContent = 'Recipe saved locally.';
 }
 
@@ -359,7 +387,7 @@ $('#ingredient-products').addEventListener('click', (event) => { const button = 
 $('#ingredient-scan').addEventListener('click', () => setView('products')); $('#ingredient-manual').addEventListener('click', () => { setView('products'); newManualProduct(); });
 $('#ingredients-list').addEventListener('input', (event) => { if (!event.target.classList.contains('ingredient-weight')) return; const ingredient = activeRecipe.ingredients.find((item) => item.id === event.target.closest('.ingredient-row').dataset.ingredient); ingredient.weightG = event.target.value; updateCalculations(); });
 $('#ingredients-list').addEventListener('click', (event) => { if (!event.target.classList.contains('remove-ingredient')) return; activeRecipe.ingredients = activeRecipe.ingredients.filter((item) => item.id !== event.target.closest('.ingredient-row').dataset.ingredient); renderRecipe(); });
-$('#cooked-weight').addEventListener('input', updateCalculations); $('#portion-weight').addEventListener('input', updateCalculations); $('#save-recipe').addEventListener('click', saveActiveRecipe);
+$('#cooked-weight').addEventListener('input', updateCalculations); $('#gross-cooked-weight').addEventListener('input', updateCookingWeight); $('#cooking-container').addEventListener('change', () => setCookingWeightMode()); $('#portion-weight').addEventListener('input', updateCalculations); $('#save-recipe').addEventListener('click', saveActiveRecipe);
 document.addEventListener('focusout', (event) => { if (!event.target.matches('input[data-round]') || event.target.value === '') return; event.target.value = roundToTwo(event.target.value); event.target.dispatchEvent(new Event('input', { bubbles: true })); });
 $('#duplicate-recipe').addEventListener('click', () => { const now = new Date().toISOString(); activeRecipe = { ...structuredClone(activeRecipe), id: crypto.randomUUID(), name: `${$('#recipe-name').value || activeRecipe.name} (copy)`, createdAt: now, updatedAt: now }; $('#recipe-name').value = activeRecipe.name; $('#recipe-status').textContent = 'Copy created. Save when ready.'; });
 $('#delete-recipe').addEventListener('click', () => { if (activeRecipe && confirm(`Delete “${activeRecipe.name || 'this recipe'}”?`)) { deleteRecipe(activeRecipe.id); closeRecipeEditor(); } });
