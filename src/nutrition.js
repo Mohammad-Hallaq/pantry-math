@@ -1,5 +1,5 @@
-export const NUTRIENTS = ['calories', 'protein', 'carbs', 'fat', 'fiber', 'salt'];
-export const EMPTY_NUTRITION = Object.freeze({ calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, salt: 0 });
+export const NUTRIENTS = ['calories', 'protein', 'carbs', 'fat', 'fiber', 'sugar'];
+export const EMPTY_NUTRITION = Object.freeze({ calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 });
 
 export function roundToTwo(value) {
   const number = Number(value);
