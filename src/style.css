@@ -203,6 +203,13 @@ dialog::backdrop { background:#10231dd9; backdrop-filter:blur(3px); }
 .daily-item .mini-unit input { font-size:16px; }
 .meal-empty { margin:20px 0 0; color:var(--muted); font-size:13px; text-align:center; }
 .selection-list button:disabled { cursor:not-allowed; opacity:.5; }
+.manual-nutrition { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:18px; }
+.manual-nutrition label { padding:12px; border:1px solid var(--line); }
+.manual-nutrition label>small { float:right; color:var(--muted); font-weight:400; }
+.manual-nutrition label>span { display:flex; align-items:baseline; margin-top:8px; }
+.manual-nutrition input { min-width:0; width:100%; border:0; outline:0; background:transparent; color:var(--ink); font:500 21px 'DM Mono'; }
+.manual-nutrition b { color:var(--muted); font:12px 'DM Mono'; }
+.manual-daily-item .secondary { min-height:38px; padding:0 12px; }
 .archive-reminder { width:100%; margin:0 0 16px; padding:14px 18px; border:1px solid #c59b2c; background:#fff1bd; color:#624b0d; font-weight:600; text-align:left; }
 
 /* Backup and monthly history */
@@ -255,4 +262,5 @@ dialog::backdrop { background:#10231dd9; backdrop-filter:blur(3px); }
 @media(max-width:700px){.brand{font-size:0}.brand span{font-size:11px}.daily-summary{grid-template-columns:1fr;padding:22px}.daily-summary .macro-grid{grid-template-columns:repeat(3,1fr)}#meal-sections{grid-template-columns:1fr}.meal-card{padding:18px}.meal-card>header{align-items:flex-start;flex-direction:column}.meal-actions{width:100%}.meal-actions .add-daily-food{margin-left:auto}.day-toolbar{position:sticky;top:0;z-index:4;gap:6px;padding:12px}.day-toolbar .secondary{display:none}.day-toolbar input{max-width:150px}.daily-item{grid-template-columns:minmax(120px,1fr) 95px 30px}.add-daily-food{min-height:40px;padding:0 12px}}
 @media(max-width:800px){.data-tools,.close-month{grid-template-columns:1fr;padding:21px}.data-actions{flex-direction:column}.history-layout{grid-template-columns:1fr}.archive-list{display:grid;grid-template-columns:repeat(2,1fr)}.archive-detail{padding:20px}.archive-columns{grid-template-columns:1fr}.topbar nav{overflow-x:auto;max-width:calc(100vw - 70px)}.nav-button{white-space:nowrap}}
 @media(max-width:480px){.archive-list,.averages{grid-template-columns:1fr}.archive-detail .macro-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:480px){.manual-nutrition{grid-template-columns:1fr 1fr}.manual-nutrition label{padding:10px}.manual-daily-item{grid-template-columns:minmax(120px,1fr) 56px 30px}.manual-daily-item .secondary{padding:0 8px}}
 
