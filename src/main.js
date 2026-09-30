@@ -1,10 +1,10 @@
 import './style.css';
 import { BrowserMultiFormatReader } from '@zxing/browser';
-import { NUTRIENTS, EMPTY_NUTRITION, calculateNutritionForWeight, sumNutrition, calculateNutritionPer100g, calculatePortionNutrition, formatNutrition, isValidNutrition, roundToTwo } from './nutrition.js';
+import { NUTRIENTS, EMPTY_NUTRITION, calculateNutritionForWeight, sumNutrition, calculateNutritionPer100g, calculatePortionNutrition, formatNutrition, isValidNutrition, normalizeNutrition, roundToTwo } from './nutrition.js';
 import { getProducts, saveProduct, getProductByBarcode, productNutrition, getRecipes, saveRecipe, deleteRecipe, getDailyLog, saveDailyLog, getAllDailyLogs, getMonthlyArchives, saveMonthlyArchive, undoMonthlyArchive, createBackupData, restoreBackupData } from './storage.js';
 
 const $ = (selector) => document.querySelector(selector);
-const nutrientLabels = { calories: 'Calories', protein: 'Protein', carbs: 'Carbs', fat: 'Fat', fiber: 'Fiber', salt: 'Salt' };
+const nutrientLabels = { calories: 'Calories', protein: 'Protein', carbs: 'Carbs', fat: 'Fat', fiber: 'Fiber', sugar: 'Sugar' };
 let scannerControls;
 let activeProduct;
 let activeRecipe;
@@ -12,13 +12,14 @@ let activeDayLog;
 let addingMealId = null;
 let editingMealId = null;
 let selectedArchiveMonth = null;
+let editingManualItemId = null;
 
 export const cleanBarcode = (value) => String(value).replace(/\D/g, '');
 export const isValidBarcode = (value) => /^\d{8,14}$/.test(cleanBarcode(value));
 
 export function normalizeProduct(product, barcode) {
   const n = product.nutriments ?? {};
-  return { id: barcode, barcode, name: product.product_name || product.generic_name || 'Unnamed product', brand: product.brands || 'Brand not listed', image: product.image_front_small_url || product.image_front_url || '', nutritionPer100g: { calories: n['energy-kcal_100g'] ?? 0, protein: n.proteins_100g ?? 0, carbs: n.carbohydrates_100g ?? 0, fat: n.fat_100g ?? 0, fiber: n.fiber_100g ?? 0, salt: n.salt_100g ?? 0 }, source: 'Open Food Facts' };
+  return { id: barcode, barcode, name: product.product_name || product.generic_name || 'Unnamed product', brand: product.brands || 'Brand not listed', image: product.image_front_small_url || product.image_front_url || '', nutritionPer100g: { calories: n['energy-kcal_100g'] ?? 0, protein: n.proteins_100g ?? 0, carbs: n.carbohydrates_100g ?? 0, fat: n.fat_100g ?? 0, fiber: n.fiber_100g ?? 0, sugar: n.sugars_100g ?? 0 }, source: 'Open Food Facts' };
 }
 
 function setView(view) {
@@ -104,7 +105,7 @@ function recipeTotal(recipe = activeRecipe) {
 }
 
 function macroMarkup(nutrition) {
-  return NUTRIENTS.map((key) => `<div class="macro ${key === 'fiber' || key === 'salt' ? 'minor' : ''}"><span>${nutrientLabels[key]}</span><strong>${formatNutrition(nutrition[key], key)}</strong><small>${key === 'calories' ? 'kcal' : 'g'}</small></div>`).join('');
+  return NUTRIENTS.map((key) => `<div class="macro ${key === 'fiber' || key === 'sugar' ? 'minor' : ''}"><span>${nutrientLabels[key]}</span><strong>${formatNutrition(nutrition[key], key)}</strong><small>${key === 'calories' ? 'kcal' : 'g'}</small></div>`).join('');
 }
 
 function renderRecipe() {
@@ -172,6 +173,7 @@ function normalizeDailyLog(log) {
 }
 
 function dailyItemNutrition(item) {
+  if (item.entryMode === 'manual-total') return normalizeNutrition(item.nutritionTotal);
   return calculateNutritionForWeight(item.nutritionPer100g, item.weightG);
 }
 
@@ -192,6 +194,7 @@ function renderDailyLog() {
     const total = sumNutrition(items.map(dailyItemNutrition));
     const rows = items.length ? items.map((item) => {
       const n = dailyItemNutrition(item);
+      if (item.entryMode === 'manual-total') return `<div class="daily-item manual-daily-item" data-daily-item="${item.id}"><div><span class="card-kicker">Manual entry</span><strong>${escapeHtml(item.name)}</strong><small>${formatNutrition(n.calories, 'calories')} kcal · ${formatNutrition(n.protein, 'protein')} g protein</small></div><button class="edit-manual-item secondary">Edit</button><button class="remove-daily-item icon-button" aria-label="Remove ${escapeHtml(item.name)}">×</button></div>`;
       return `<div class="daily-item" data-daily-item="${item.id}"><div><span class="card-kicker">${item.sourceType}</span><strong>${escapeHtml(item.name)}</strong><small>${formatNutrition(n.calories, 'calories')} kcal · ${formatNutrition(n.protein, 'protein')} g protein</small></div><label>Amount<div class="mini-unit"><input class="daily-weight" data-round type="number" min="0" step="any" inputmode="decimal" value="${item.weightG || ''}"><b>g</b></div></label><button class="remove-daily-item icon-button" aria-label="Remove ${escapeHtml(item.name)}">×</button></div>`;
     }).join('') : '<p class="meal-empty">Nothing logged yet.</p>';
     return `<section class="meal-card" data-meal-id="${meal.id}"><header><div><p class="kicker">Meal</p><h2>${escapeHtml(meal.name)}</h2><strong>${formatNutrition(total.calories, 'calories')} kcal</strong></div><div class="meal-actions"><button class="rename-meal secondary" aria-label="Rename ${escapeHtml(meal.name)}">Rename</button><button class="delete-meal icon-button" aria-label="Delete ${escapeHtml(meal.name)}">×</button><button class="add-daily-food primary">+ Add food</button></div></header>${rows}</section>`;
@@ -221,6 +224,30 @@ function addFoodToDay(sourceId, sourceType) {
   activeDayLog.items.push({ id: crypto.randomUUID(), sourceId, sourceType, name: source.name, nutritionPer100g: source.nutritionPer100g, weightG: '', mealId: addingMealId });
   saveDailyLog(activeDayLog); $('#food-dialog').close(); renderDailyLog();
   requestAnimationFrame(() => $(`[data-daily-item]:last-of-type .daily-weight`)?.focus());
+}
+
+function openManualFoodDialog(item = null) {
+  editingManualItemId = item?.id ?? null;
+  $('#manual-food-title').textContent = item ? 'Edit manual food' : 'Enter food manually';
+  $('#manual-food-name').value = item?.name ?? '';
+  NUTRIENTS.forEach((key) => { $(`#manual-${key}`).value = item?.nutritionTotal?.[key] ?? ''; });
+  $('#manual-food-error').textContent = '';
+  $('#manual-food-dialog').showModal();
+  requestAnimationFrame(() => $('#manual-food-name').focus());
+}
+
+function saveManualFood() {
+  const name = $('#manual-food-name').value.trim();
+  const rawCalories = $('#manual-calories').value;
+  const nutritionTotal = Object.fromEntries(NUTRIENTS.map((key) => [key, $(`#manual-${key}`).value === '' ? 0 : roundToTwo($(`#manual-${key}`).value)]));
+  if (!name || rawCalories === '' || !isValidNutrition(nutritionTotal)) { $('#manual-food-error').textContent = 'Enter a name, calories, and valid non-negative optional macros.'; return; }
+  if (editingManualItemId) {
+    const item = activeDayLog.items.find((entry) => entry.id === editingManualItemId);
+    Object.assign(item, { name, nutritionTotal });
+  } else {
+    activeDayLog.items.push({ id: crypto.randomUUID(), sourceType: 'Manual', entryMode: 'manual-total', name, nutritionTotal, mealId: addingMealId });
+  }
+  saveDailyLog(activeDayLog); $('#manual-food-dialog').close(); renderDailyLog();
 }
 
 function shiftLogDate(days) {
@@ -344,6 +371,8 @@ $('#meal-sections').addEventListener('click', (event) => {
   if (rename) { const meal = activeDayLog.meals.find((entry) => entry.id === rename.closest('[data-meal-id]').dataset.mealId); openMealDialog(meal); return; }
   const deleteButton = event.target.closest('.delete-meal');
   if (deleteButton) { const mealId = deleteButton.closest('[data-meal-id]').dataset.mealId; const meal = activeDayLog.meals.find((entry) => entry.id === mealId); if (confirm(`Delete “${meal.name}” and everything logged in it?`)) { activeDayLog.meals = activeDayLog.meals.filter((entry) => entry.id !== mealId); activeDayLog.items = activeDayLog.items.filter((item) => item.mealId !== mealId); saveDailyLog(activeDayLog); renderDailyLog(); } return; }
+  const editManual = event.target.closest('.edit-manual-item');
+  if (editManual) { const item = activeDayLog.items.find((entry) => entry.id === editManual.closest('[data-daily-item]').dataset.dailyItem); openManualFoodDialog(item); return; }
   const remove = event.target.closest('.remove-daily-item');
   if (remove) { const id = remove.closest('[data-daily-item]').dataset.dailyItem; activeDayLog.items = activeDayLog.items.filter((item) => item.id !== id); saveDailyLog(activeDayLog); renderDailyLog(); }
 });
@@ -354,6 +383,9 @@ $('#meal-sections').addEventListener('change', (event) => {
 });
 $('#food-search').addEventListener('input', (event) => renderFoodChoices(event.target.value));
 $('#food-choices').addEventListener('click', (event) => { const choice = event.target.closest('[data-food-id]'); if (choice && !choice.disabled) addFoodToDay(choice.dataset.foodId, choice.dataset.foodType); });
+$('#manual-daily-food').addEventListener('click', () => setTimeout(() => openManualFoodDialog(), 0));
+$('#close-manual-food').addEventListener('click', () => $('#manual-food-dialog').close());
+$('#manual-food-form').addEventListener('submit', (event) => { event.preventDefault(); saveManualFood(); });
 $('#log-date').addEventListener('change', (event) => setLogDate(event.target.value));
 $('#previous-day').addEventListener('click', () => shiftLogDate(-1));
 $('#next-day').addEventListener('click', () => shiftLogDate(1));
