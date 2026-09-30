@@ -7,6 +7,13 @@ export function roundToTwo(value) {
   return Math.round((number + Number.EPSILON) * 100) / 100;
 }
 
+export function calculateNetWeight(grossWeightG, containerWeightG) {
+  const gross = Number(grossWeightG);
+  const container = Number(containerWeightG);
+  if (!Number.isFinite(gross) || !Number.isFinite(container) || gross <= container || container < 0) return 0;
+  return roundToTwo(gross - container);
+}
+
 export function normalizeNutrition(value = {}) {
   return Object.fromEntries(NUTRIENTS.map((key) => {
     const number = Number(value[key] ?? 0);
