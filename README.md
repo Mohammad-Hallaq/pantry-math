@@ -22,6 +22,8 @@ Open the address printed by Vite. Camera access works on `localhost`; access fro
 - Custom named meals for each day
 - Full JSON backup and restore
 - Monthly closing with compact daily archives, averages, and calorie trend plots
+- Sugar tracking throughout products, recipes, portions, and history
+- Calories-only manual foods in daily meals, with optional macros
 
 Open Food Facts is community-maintained, so check values against the product packaging before saving.
 
