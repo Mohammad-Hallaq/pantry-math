@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateNutritionForWeight, sumNutrition, calculateNutritionPer100g, calculatePortionNutrition, normalizeNutrition, roundToTwo } from '../src/nutrition.js';
+import { calculateNutritionForWeight, sumNutrition, calculateNutritionPer100g, calculatePortionNutrition, calculateNetWeight, normalizeNutrition, roundToTwo } from '../src/nutrition.js';
 
 const nutrition = (calories) => ({ calories, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 });
 
@@ -47,5 +47,10 @@ test('tracks sugar instead of salt', () => {
 test('supports calories-only manual food totals', () => {
   const manual = normalizeNutrition({ calories: 240 });
   assert.deepEqual(manual, nutrition(240));
+});
+
+test('subtracts cooking container weight from the scale reading', () => {
+  assert.equal(calculateNetWeight(2500, 1469), 1031);
+  assert.equal(calculateNetWeight(1125, 1125), 0);
 });
 
