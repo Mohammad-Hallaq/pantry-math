@@ -6,6 +6,7 @@ import { getProducts, saveProduct, getProductByBarcode, productNutrition, getRec
 const $ = (selector) => document.querySelector(selector);
 const nutrientLabels = { calories: 'Calories', protein: 'Protein', carbs: 'Carbs', fat: 'Fat', fiber: 'Fiber', sugar: 'Sugar' };
 let scannerControls;
+let snackScannerControls;
 let activeProduct;
 let activeRecipe;
 let activeDayLog;
@@ -255,13 +256,64 @@ function addFoodToDay(sourceId, sourceType) {
 }
 
 function openManualFoodDialog(item = null) {
+  stopSnackScanner();
   editingManualItemId = item?.id ?? null;
   $('#manual-food-title').textContent = item ? 'Edit manual food' : 'Enter food manually';
   $('#manual-food-name').value = item?.name ?? '';
   NUTRIENTS.forEach((key) => { $(`#manual-${key}`).value = item?.nutritionTotal?.[key] ?? ''; });
   $('#manual-food-error').textContent = '';
+  $('#snack-barcode-tools').hidden = Boolean(item);
+  $('#snack-barcode').value = '';
+  $('#snack-lookup-status').textContent = 'The scanned item is used only for this daily entry.';
   $('#manual-food-dialog').showModal();
   requestAnimationFrame(() => $('#manual-food-name').focus());
+}
+
+function stopSnackScanner() {
+  snackScannerControls?.stop();
+  snackScannerControls = undefined;
+  $('#snack-scanner').hidden = true;
+  $('#snack-open-camera').hidden = false;
+}
+
+async function lookupSnackBarcode(value) {
+  const barcode = cleanBarcode(value);
+  $('#snack-barcode').value = barcode;
+  const status = $('#snack-lookup-status');
+  if (!isValidBarcode(barcode)) { status.textContent = 'Enter a barcode containing 8 to 14 digits.'; return; }
+  status.textContent = 'Looking up the snack…';
+  try {
+    const fields = 'code,product_name,generic_name,brands,nutriments,serving_quantity,serving_size';
+    const response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${barcode}.json?fields=${fields}`);
+    const data = response.ok ? await response.json() : null;
+    if (!data || data.status !== 1) { status.textContent = 'This barcode was not found. You can still enter the label values manually.'; return; }
+    const product = normalizeProduct(data.product, barcode);
+    const servingQuantity = Number(data.product.serving_quantity);
+    const usesServing = Number.isFinite(servingQuantity) && servingQuantity > 0;
+    const nutrition = usesServing ? calculateNutritionForWeight(product.nutritionPer100g, servingQuantity) : product.nutritionPer100g;
+    $('#manual-food-name').value = product.name;
+    NUTRIENTS.forEach((key) => { `#manual-${key}`; $(`#manual-${key}`).value = roundToTwo(nutrition[key]); });
+    status.textContent = usesServing
+      ? `Filled for one serving (${data.product.serving_size || `${roundToTwo(servingQuantity)} g`}). Check the package before saving.`
+      : 'Serving size was unavailable, so values are per 100 g. Adjust them to the amount you ate.';
+  } catch {
+    status.textContent = 'The lookup could not be completed. Check your connection or enter the label values manually.';
+  }
+}
+
+async function startSnackScanner() {
+  $('#snack-lookup-status').textContent = 'Starting camera…';
+  $('#snack-open-camera').hidden = true;
+  $('#snack-scanner').hidden = false;
+  try {
+    const reader = new BrowserMultiFormatReader();
+    snackScannerControls = await reader.decodeFromVideoDevice(undefined, $('#snack-scanner-video'), (result) => {
+      if (result && isValidBarcode(result.getText())) { stopSnackScanner(); lookupSnackBarcode(result.getText()); }
+    });
+  } catch (error) {
+    stopSnackScanner();
+    $('#snack-lookup-status').textContent = error?.name === 'NotAllowedError' ? 'Camera permission was denied. Enter the barcode digits instead.' : 'The camera could not start. Enter the barcode digits instead.';
+  }
 }
 
 function saveManualFood() {
@@ -412,7 +464,11 @@ $('#meal-sections').addEventListener('change', (event) => {
 $('#food-search').addEventListener('input', (event) => renderFoodChoices(event.target.value));
 $('#food-choices').addEventListener('click', (event) => { const choice = event.target.closest('[data-food-id]'); if (choice && !choice.disabled) addFoodToDay(choice.dataset.foodId, choice.dataset.foodType); });
 $('#manual-daily-food').addEventListener('click', () => setTimeout(() => openManualFoodDialog(), 0));
-$('#close-manual-food').addEventListener('click', () => $('#manual-food-dialog').close());
+$('#close-manual-food').addEventListener('click', () => { stopSnackScanner(); $('#manual-food-dialog').close(); });
+$('#snack-open-camera').addEventListener('click', startSnackScanner);
+$('#snack-close-camera').addEventListener('click', stopSnackScanner);
+$('#snack-lookup').addEventListener('click', () => lookupSnackBarcode($('#snack-barcode').value));
+$('#snack-barcode').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); lookupSnackBarcode(event.currentTarget.value); } });
 $('#manual-food-form').addEventListener('submit', (event) => { event.preventDefault(); saveManualFood(); });
 $('#log-date').addEventListener('change', (event) => setLogDate(event.target.value));
 $('#previous-day').addEventListener('click', () => shiftLogDate(-1));
