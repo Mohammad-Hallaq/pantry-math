@@ -292,7 +292,7 @@ async function lookupSnackBarcode(value) {
     const usesServing = Number.isFinite(servingQuantity) && servingQuantity > 0;
     const nutrition = usesServing ? calculateNutritionForWeight(product.nutritionPer100g, servingQuantity) : product.nutritionPer100g;
     $('#manual-food-name').value = product.name;
-    NUTRIENTS.forEach((key) => { `#manual-${key}`; $(`#manual-${key}`).value = roundToTwo(nutrition[key]); });
+    NUTRIENTS.forEach((key) => { $(`#manual-${key}`).value = roundToTwo(nutrition[key]); });
     status.textContent = usesServing
       ? `Filled for one serving (${data.product.serving_size || `${roundToTwo(servingQuantity)} g`}). Check the package before saving.`
       : 'Serving size was unavailable, so values are per 100 g. Adjust them to the amount you ate.';
