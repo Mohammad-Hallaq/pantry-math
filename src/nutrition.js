@@ -25,6 +25,18 @@ export function isValidNutrition(value) {
   return NUTRIENTS.every((key) => Number.isFinite(Number(value?.[key])) && Number(value[key]) >= 0);
 }
 
+export function calculateServingNutrition(nutritionPer100g, nutritionPerServing = {}, servingQuantityG) {
+  const quantity = Number(servingQuantityG);
+  const fallback = Number.isFinite(quantity) && quantity > 0
+    ? calculateNutritionForWeight(nutritionPer100g, quantity)
+    : normalizeNutrition(nutritionPer100g);
+  return Object.fromEntries(NUTRIENTS.map((key) => {
+    const raw = nutritionPerServing?.[key];
+    const direct = Number(raw);
+    return [key, raw !== '' && raw != null && Number.isFinite(direct) && direct >= 0 ? direct : fallback[key]];
+  }));
+}
+
 export function calculateNutritionForWeight(nutritionPer100g, weightG) {
   const weight = Number(weightG);
   if (!Number.isFinite(weight) || weight < 0) return { ...EMPTY_NUTRITION };
