@@ -1,6 +1,6 @@
 import './style.css';
 import { BrowserMultiFormatReader } from '@zxing/browser';
-import { NUTRIENTS, EMPTY_NUTRITION, calculateNutritionForWeight, sumNutrition, calculateNutritionPer100g, calculatePortionNutrition, calculateNetWeight, formatNutrition, isValidNutrition, normalizeNutrition, roundToTwo } from './nutrition.js';
+import { NUTRIENTS, EMPTY_NUTRITION, calculateNutritionForWeight, calculateServingNutrition, sumNutrition, calculateNutritionPer100g, calculatePortionNutrition, calculateNetWeight, formatNutrition, isValidNutrition, normalizeNutrition, roundToTwo } from './nutrition.js';
 import { getProducts, saveProduct, getProductByBarcode, productNutrition, getRecipes, saveRecipe, deleteRecipe, getDailyLog, saveDailyLog, getAllDailyLogs, getMonthlyArchives, saveMonthlyArchive, undoMonthlyArchive, createBackupData, restoreBackupData } from './storage.js';
 
 const $ = (selector) => document.querySelector(selector);
@@ -289,13 +289,21 @@ async function lookupSnackBarcode(value) {
     if (!data || data.status !== 1) { status.textContent = 'This barcode was not found. You can still enter the label values manually.'; return; }
     const product = normalizeProduct(data.product, barcode);
     const servingQuantity = Number(data.product.serving_quantity);
-    const usesServing = Number.isFinite(servingQuantity) && servingQuantity > 0;
-    const nutrition = usesServing ? calculateNutritionForWeight(product.nutritionPer100g, servingQuantity) : product.nutritionPer100g;
+    const usesServingQuantity = Number.isFinite(servingQuantity) && servingQuantity > 0;
+    const n = data.product.nutriments ?? {};
+    const servingNutrition = {
+      calories: n['energy-kcal_serving'], protein: n.proteins_serving, carbs: n.carbohydrates_serving,
+      fat: n.fat_serving, fiber: n.fiber_serving, sugar: n.sugars_serving
+    };
+    const hasDirectServing = NUTRIENTS.some((key) => servingNutrition[key] !== '' && servingNutrition[key] != null && Number.isFinite(Number(servingNutrition[key])));
+    const nutrition = calculateServingNutrition(product.nutritionPer100g, servingNutrition, servingQuantity);
     $('#manual-food-name').value = product.name;
     NUTRIENTS.forEach((key) => { $(`#manual-${key}`).value = roundToTwo(nutrition[key]); });
-    status.textContent = usesServing
-      ? `Filled for one serving (${data.product.serving_size || `${roundToTwo(servingQuantity)} g`}). Check the package before saving.`
-      : 'Serving size was unavailable, so values are per 100 g. Adjust them to the amount you ate.';
+    status.textContent = hasDirectServing
+      ? `Filled from the product's direct per-serving values${data.product.serving_size ? ` (${data.product.serving_size})` : ''}. Missing fields use the per-100-g fallback. Check the package before saving.`
+      : usesServingQuantity
+        ? `Direct serving values were unavailable, so per-100-g values were calculated for ${data.product.serving_size || `${roundToTwo(servingQuantity)} g`}. Check the package before saving.`
+        : 'Serving values were unavailable, so values are per 100 g. Adjust them to the amount you ate.';
   } catch {
     status.textContent = 'The lookup could not be completed. Check your connection or enter the label values manually.';
   }
