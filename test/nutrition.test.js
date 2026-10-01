@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateNutritionForWeight, sumNutrition, calculateNutritionPer100g, calculatePortionNutrition, calculateNetWeight, normalizeNutrition, roundToTwo } from '../src/nutrition.js';
+import { calculateNutritionForWeight, sumNutrition, calculateNutritionPer100g, calculatePortionNutrition, calculateNetWeight, calculateServingNutrition, normalizeNutrition, roundToTwo } from '../src/nutrition.js';
 
 const nutrition = (calories) => ({ calories, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 });
 
@@ -54,3 +54,12 @@ test('subtracts cooking container weight from the scale reading', () => {
   assert.equal(calculateNetWeight(1125, 1125), 0);
 });
 
+test('prefers direct per-serving snack values and falls back per nutrient', () => {
+  const per100g = { calories: 400, protein: 30, carbs: 40, fat: 10, fiber: 8, sugar: 12 };
+  const direct = { calories: 250, protein: 20, carbs: 24, fat: 7, fiber: 5, sugar: 8 };
+  assert.deepEqual(calculateServingNutrition(per100g, direct, 68), direct);
+  const partial = calculateServingNutrition(per100g, { calories: 250, protein: 20 }, 68);
+  assert.equal(partial.calories, 250);
+  assert.equal(partial.protein, 20);
+  assert.equal(partial.carbs, 27.2);
+});
