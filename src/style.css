@@ -204,6 +204,10 @@ dialog::backdrop { background:#10231dd9; backdrop-filter:blur(3px); }
 .meal-empty { margin:20px 0 0; color:var(--muted); font-size:13px; text-align:center; }
 .selection-list button:disabled { cursor:not-allowed; opacity:.5; }
 .manual-nutrition { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:18px; }
+#snack-barcode-tools { margin-bottom:22px; padding-bottom:22px; border-bottom:1px solid var(--line); }
+#snack-barcode-tools .secondary { margin:0 0 10px; }
+.snack-scanner { height:240px; margin-bottom:10px; }
+.snack-lookup-status { display:block; min-height:18px; margin-top:8px; color:var(--muted); line-height:1.4; }
 .manual-nutrition label { padding:12px; border:1px solid var(--line); }
 .manual-nutrition label>small { float:right; color:var(--muted); font-weight:400; }
 .manual-nutrition label>span { display:flex; align-items:baseline; margin-top:8px; }
