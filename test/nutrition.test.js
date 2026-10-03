@@ -63,3 +63,9 @@ test('prefers direct per-serving snack values and falls back per nutrient', () =
   assert.equal(partial.protein, 20);
   assert.equal(partial.carbs, 27.2);
 });
+
+test('supports decimal quantities for repeated daily items', () => {
+  const oneItem = nutrition(240);
+  assert.equal(calculateNutritionForWeight(oneItem, 150).calories, 360);
+  assert.equal(calculateNutritionForWeight(oneItem, 200).calories, 480);
+});
