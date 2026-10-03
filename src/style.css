@@ -196,6 +196,9 @@ dialog::backdrop { background:#10231dd9; backdrop-filter:blur(3px); }
 .meal-actions .primary { min-height:38px; padding:0 12px; }
 .meals-empty { margin-top:0; }
 .daily-item { display:grid; grid-template-columns:minmax(130px,1fr) 105px 34px; gap:14px; align-items:center; padding:15px 0; border-bottom:1px solid var(--line); }
+.weighted-daily-item { grid-template-columns:minmax(130px,1fr) 95px 75px 34px; }
+.manual-daily-item { grid-template-columns:minmax(130px,1fr) 75px auto 34px; }
+.quick-serving-item { grid-template-columns:minmax(130px,1fr) 75px 34px; }
 .daily-item>div:first-child { min-width:0; display:flex; flex-direction:column; gap:4px; }
 .daily-item>div:first-child strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .daily-item small { color:var(--muted); font-size:11px; }
@@ -213,6 +216,8 @@ dialog::backdrop { background:#10231dd9; backdrop-filter:blur(3px); }
 .manual-nutrition label>span { display:flex; align-items:baseline; margin-top:8px; }
 .manual-nutrition input { min-width:0; width:100%; border:0; outline:0; background:transparent; color:var(--ink); font:500 21px 'DM Mono'; }
 .manual-nutrition b { color:var(--muted); font:12px 'DM Mono'; }
+.save-recipe-option { display:flex; align-items:center; gap:10px; margin-top:16px; padding:13px; border:1px solid var(--line); background:#f7f4eb; }
+.save-recipe-option input { width:18px; height:18px; }
 .manual-daily-item .secondary { min-height:38px; padding:0 12px; }
 .archive-reminder { width:100%; margin:0 0 16px; padding:14px 18px; border:1px solid #c59b2c; background:#fff1bd; color:#624b0d; font-weight:600; text-align:left; }
 
@@ -263,8 +268,8 @@ dialog::backdrop { background:#10231dd9; backdrop-filter:blur(3px); }
 
 @media(max-width:700px){.topbar{height:72px}.topbar nav{gap:0}.nav-button{padding:8px 10px}.hero.compact{padding-top:42px}.card-grid{grid-template-columns:1fr}.section-heading-row{align-items:center}.section-heading-row h2{font-size:25px}.editor-top{align-items:flex-start}.editor-actions{flex-direction:column}.recipe-name-wrap,.recipe-panel,.breakdown{padding:20px}.ingredient-row{grid-template-columns:1fr 120px 30px;gap:12px}.ingredient-energy{display:none}.recipe-results{grid-template-columns:1fr}.result-block{border-right:0;border-bottom:1px solid var(--line)}.result-block:last-child{border-bottom:0}.portion-block{grid-column:auto}.sticky-save{bottom:6px}.dialog-actions{flex-direction:column}.macro strong{font-size:19px}}
 
-@media(max-width:700px){.brand{font-size:0}.brand span{font-size:11px}.daily-summary{grid-template-columns:1fr;padding:22px}.daily-summary .macro-grid{grid-template-columns:repeat(3,1fr)}#meal-sections{grid-template-columns:1fr}.meal-card{padding:18px}.meal-card>header{align-items:flex-start;flex-direction:column}.meal-actions{width:100%}.meal-actions .add-daily-food{margin-left:auto}.day-toolbar{position:sticky;top:0;z-index:4;gap:6px;padding:12px}.day-toolbar .secondary{display:none}.day-toolbar input{max-width:150px}.daily-item{grid-template-columns:minmax(120px,1fr) 95px 30px}.add-daily-food{min-height:40px;padding:0 12px}}
+@media(max-width:700px){.brand{font-size:0}.brand span{font-size:11px}.daily-summary{grid-template-columns:1fr;padding:22px}.daily-summary .macro-grid{grid-template-columns:repeat(3,1fr)}#meal-sections{grid-template-columns:1fr}.meal-card{padding:18px}.meal-card>header{align-items:flex-start;flex-direction:column}.meal-actions{width:100%}.meal-actions .add-daily-food{margin-left:auto}.day-toolbar{position:sticky;top:0;z-index:4;gap:6px;padding:12px}.day-toolbar .secondary{display:none}.day-toolbar input{max-width:150px}.daily-item{grid-template-columns:minmax(120px,1fr) 75px 30px}.weighted-daily-item{grid-template-columns:minmax(120px,1fr) 82px 65px 30px}.manual-daily-item{grid-template-columns:minmax(120px,1fr) 65px auto 30px}.add-daily-food{min-height:40px;padding:0 12px}}
 @media(max-width:800px){.data-tools,.close-month{grid-template-columns:1fr;padding:21px}.data-actions{flex-direction:column}.history-layout{grid-template-columns:1fr}.archive-list{display:grid;grid-template-columns:repeat(2,1fr)}.archive-detail{padding:20px}.archive-columns{grid-template-columns:1fr}.topbar nav{overflow-x:auto;max-width:calc(100vw - 70px)}.nav-button{white-space:nowrap}}
 @media(max-width:480px){.archive-list,.averages{grid-template-columns:1fr}.archive-detail .macro-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:480px){.manual-nutrition{grid-template-columns:1fr 1fr}.manual-nutrition label{padding:10px}.manual-daily-item{grid-template-columns:minmax(120px,1fr) 56px 30px}.manual-daily-item .secondary{padding:0 8px}}
+@media(max-width:480px){.manual-nutrition{grid-template-columns:1fr 1fr}.manual-nutrition label{padding:10px}.weighted-daily-item{grid-template-columns:1fr 74px 58px 28px;gap:8px}.manual-daily-item{grid-template-columns:1fr 58px 48px 28px;gap:8px}.manual-daily-item .secondary{padding:0 7px;font-size:11px}}
 
