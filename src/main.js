@@ -202,8 +202,12 @@ function normalizeDailyLog(log) {
 }
 
 function dailyItemNutrition(item) {
-  if (item.entryMode === 'manual-total') return normalizeNutrition(item.nutritionTotal);
-  return calculateNutritionForWeight(item.nutritionPer100g, item.weightG);
+  const quantity = Number(item.quantity ?? 1);
+  if (!Number.isFinite(quantity) || quantity < 0) return { ...EMPTY_NUTRITION };
+  const base = item.entryMode === 'manual-total' || item.entryMode === 'quick-serving'
+    ? normalizeNutrition(item.nutritionTotal)
+    : calculateNutritionForWeight(item.nutritionPer100g, item.weightG);
+  return calculateNutritionForWeight(base, quantity * 100);
 }
 
 function dailyTotal() {
@@ -223,8 +227,11 @@ function renderDailyLog() {
     const total = sumNutrition(items.map(dailyItemNutrition));
     const rows = items.length ? items.map((item) => {
       const n = dailyItemNutrition(item);
-      if (item.entryMode === 'manual-total') return `<div class="daily-item manual-daily-item" data-daily-item="${item.id}"><div><span class="card-kicker">Manual entry</span><strong>${escapeHtml(item.name)}</strong><small>${formatNutrition(n.calories, 'calories')} kcal · ${formatNutrition(n.protein, 'protein')} g protein</small></div><button class="edit-manual-item secondary">Edit</button><button class="remove-daily-item icon-button" aria-label="Remove ${escapeHtml(item.name)}">×</button></div>`;
-      return `<div class="daily-item" data-daily-item="${item.id}"><div><span class="card-kicker">${item.sourceType}</span><strong>${escapeHtml(item.name)}</strong><small>${formatNutrition(n.calories, 'calories')} kcal · ${formatNutrition(n.protein, 'protein')} g protein</small></div><label>Amount<div class="mini-unit"><input class="daily-weight" data-round type="number" min="0" step="any" inputmode="decimal" value="${item.weightG || ''}"><b>g</b></div></label><button class="remove-daily-item icon-button" aria-label="Remove ${escapeHtml(item.name)}">×</button></div>`;
+      const quantity = item.quantity ?? 1;
+      const quantityInput = `<label>Qty<div class="mini-unit"><input class="daily-quantity" data-round type="number" min="0.01" step="any" inputmode="decimal" value="${quantity}"><b>×</b></div></label>`;
+      if (item.entryMode === 'manual-total') return `<div class="daily-item manual-daily-item" data-daily-item="${item.id}"><div><span class="card-kicker">Manual entry</span><strong>${escapeHtml(item.name)}</strong><small>${formatNutrition(n.calories, 'calories')} kcal · ${formatNutrition(n.protein, 'protein')} g protein</small></div>${quantityInput}<button class="edit-manual-item secondary">Edit</button><button class="remove-daily-item icon-button" aria-label="Remove ${escapeHtml(item.name)}">×</button></div>`;
+      if (item.entryMode === 'quick-serving') return `<div class="daily-item quick-serving-item" data-daily-item="${item.id}"><div><span class="card-kicker">Saved recipe</span><strong>${escapeHtml(item.name)}</strong><small>${formatNutrition(n.calories, 'calories')} kcal · ${formatNutrition(n.protein, 'protein')} g protein</small></div>${quantityInput}<button class="remove-daily-item icon-button" aria-label="Remove ${escapeHtml(item.name)}">×</button></div>`;
+      return `<div class="daily-item weighted-daily-item" data-daily-item="${item.id}"><div><span class="card-kicker">${item.sourceType}</span><strong>${escapeHtml(item.name)}</strong><small>${formatNutrition(n.calories, 'calories')} kcal · ${formatNutrition(n.protein, 'protein')} g protein</small></div><label>Amount<div class="mini-unit"><input class="daily-weight" data-round type="number" min="0" step="any" inputmode="decimal" value="${item.weightG || ''}"><b>g</b></div></label>${quantityInput}<button class="remove-daily-item icon-button" aria-label="Remove ${escapeHtml(item.name)}">×</button></div>`;
     }).join('') : '<p class="meal-empty">Nothing logged yet.</p>';
     return `<section class="meal-card" data-meal-id="${meal.id}"><header><div><p class="kicker">Meal</p><h2>${escapeHtml(meal.name)}</h2><strong>${formatNutrition(total.calories, 'calories')} kcal</strong></div><div class="meal-actions"><button class="rename-meal secondary" aria-label="Rename ${escapeHtml(meal.name)}">Rename</button><button class="delete-meal icon-button" aria-label="Delete ${escapeHtml(meal.name)}">×</button><button class="add-daily-food primary">+ Add food</button></div></header>${rows}</section>`;
   }).join('') : '<div class="empty-state meals-empty"><strong>No meals yet.</strong><br>Create your first meal and name it however you like.</div>';
@@ -234,9 +241,9 @@ function renderDailyLog() {
 function renderFoodChoices(query = '') {
   const search = query.trim().toLowerCase();
   const products = getProducts().filter((product) => product.name.toLowerCase().includes(search)).map((product) => ({ id: product.id, name: product.name, type: 'Product', nutritionPer100g: productNutrition(product), available: true }));
-  const recipes = getRecipes().filter((recipe) => recipe.name.toLowerCase().includes(search)).map((recipe) => ({ id: recipe.id, name: recipe.name, type: 'Recipe', nutritionPer100g: recipe.cookedWeightG > 0 ? calculateNutritionPer100g(recipeTotal(recipe), recipe.cookedWeightG) : EMPTY_NUTRITION, available: recipe.cookedWeightG > 0 }));
+  const recipes = getRecipes().filter((recipe) => recipe.name.toLowerCase().includes(search)).map((recipe) => ({ id: recipe.id, name: recipe.name, type: 'Recipe', quickServing: Boolean(recipe.quickServing), nutritionPer100g: recipe.cookedWeightG > 0 ? calculateNutritionPer100g(recipeTotal(recipe), recipe.cookedWeightG) : EMPTY_NUTRITION, available: recipe.cookedWeightG > 0 }));
   const choices = [...recipes, ...products];
-  $('#food-choices').innerHTML = choices.length ? choices.map((choice) => `<button type="button" data-food-id="${choice.id}" data-food-type="${choice.type}" ${choice.available ? '' : 'disabled'}><span><strong>${escapeHtml(choice.name)}</strong><small>${choice.type}${choice.available ? ` · ${formatNutrition(choice.nutritionPer100g.calories, 'calories')} kcal / 100 g` : ' · Add cooked weight first'}</small></span><b>${choice.available ? '+' : '!'}</b></button>`).join('') : '<p class="empty-state small">No matching saved foods.</p>';
+  $('#food-choices').innerHTML = choices.length ? choices.map((choice) => `<button type="button" data-food-id="${choice.id}" data-food-type="${choice.type}" ${choice.available ? '' : 'disabled'}><span><strong>${escapeHtml(choice.name)}</strong><small>${choice.type}${choice.available ? choice.quickServing ? ` · ${formatNutrition(choice.nutritionPer100g.calories, 'calories')} kcal / serving` : ` · ${formatNutrition(choice.nutritionPer100g.calories, 'calories')} kcal / 100 g` : ' · Add cooked weight first'}</small></span><b>${choice.available ? '+' : '!'}</b></button>`).join('') : '<p class="empty-state small">No matching saved foods.</p>';
 }
 
 function addFoodToDay(sourceId, sourceType) {
@@ -244,13 +251,18 @@ function addFoodToDay(sourceId, sourceType) {
   if (sourceType === 'Recipe') {
     const recipe = getRecipes().find((item) => item.id === sourceId);
     if (!recipe?.cookedWeightG) return;
+    if (recipe.quickServing) {
+      activeDayLog.items.push({ id: crypto.randomUUID(), sourceId, sourceType, entryMode: 'quick-serving', name: recipe.name, nutritionTotal: recipeTotal(recipe), quantity: 1, mealId: addingMealId });
+      saveDailyLog(activeDayLog); $('#food-dialog').close(); renderDailyLog();
+      return;
+    }
     source = { name: recipe.name, nutritionPer100g: calculateNutritionPer100g(recipeTotal(recipe), recipe.cookedWeightG) };
   } else {
     const product = getProducts().find((item) => item.id === sourceId);
     if (!product) return;
     source = { name: product.name, nutritionPer100g: productNutrition(product) };
   }
-  activeDayLog.items.push({ id: crypto.randomUUID(), sourceId, sourceType, name: source.name, nutritionPer100g: source.nutritionPer100g, weightG: '', mealId: addingMealId });
+  activeDayLog.items.push({ id: crypto.randomUUID(), sourceId, sourceType, name: source.name, nutritionPer100g: source.nutritionPer100g, weightG: '', quantity: 1, mealId: addingMealId });
   saveDailyLog(activeDayLog); $('#food-dialog').close(); renderDailyLog();
   requestAnimationFrame(() => $(`[data-daily-item]:last-of-type .daily-weight`)?.focus());
 }
@@ -263,6 +275,8 @@ function openManualFoodDialog(item = null) {
   NUTRIENTS.forEach((key) => { $(`#manual-${key}`).value = item?.nutritionTotal?.[key] ?? ''; });
   $('#manual-food-error').textContent = '';
   $('#snack-barcode-tools').hidden = Boolean(item);
+  $('#save-snack-recipe-wrap').hidden = Boolean(item);
+  $('#save-snack-recipe').checked = false;
   $('#snack-barcode').value = '';
   $('#snack-lookup-status').textContent = 'The scanned item is used only for this daily entry.';
   $('#manual-food-dialog').showModal();
@@ -333,7 +347,15 @@ function saveManualFood() {
     const item = activeDayLog.items.find((entry) => entry.id === editingManualItemId);
     Object.assign(item, { name, nutritionTotal });
   } else {
-    activeDayLog.items.push({ id: crypto.randomUUID(), sourceType: 'Manual', entryMode: 'manual-total', name, nutritionTotal, mealId: addingMealId });
+    activeDayLog.items.push({ id: crypto.randomUUID(), sourceType: 'Manual', entryMode: 'manual-total', name, nutritionTotal, quantity: 1, mealId: addingMealId });
+    if ($('#save-snack-recipe').checked) {
+      const now = new Date().toISOString();
+      saveRecipe({
+        id: crypto.randomUUID(), name, quickServing: true,
+        ingredients: [{ id: crypto.randomUUID(), productId: null, productName: '1 serving', nutritionPer100g: nutritionTotal, weightG: 100 }],
+        cookedWeightG: 100, createdAt: now, updatedAt: now
+      });
+    }
   }
   saveDailyLog(activeDayLog); $('#manual-food-dialog').close(); renderDailyLog();
 }
@@ -465,9 +487,11 @@ $('#meal-sections').addEventListener('click', (event) => {
   if (remove) { const id = remove.closest('[data-daily-item]').dataset.dailyItem; activeDayLog.items = activeDayLog.items.filter((item) => item.id !== id); saveDailyLog(activeDayLog); renderDailyLog(); }
 });
 $('#meal-sections').addEventListener('change', (event) => {
-  if (!event.target.classList.contains('daily-weight')) return;
+  if (!event.target.classList.contains('daily-weight') && !event.target.classList.contains('daily-quantity')) return;
   const item = activeDayLog.items.find((entry) => entry.id === event.target.closest('[data-daily-item]').dataset.dailyItem);
-  item.weightG = roundToTwo(event.target.value); saveDailyLog(activeDayLog); renderDailyLog();
+  if (event.target.classList.contains('daily-quantity')) item.quantity = Math.max(0, roundToTwo(event.target.value));
+  else item.weightG = roundToTwo(event.target.value);
+  saveDailyLog(activeDayLog); renderDailyLog();
 });
 $('#food-search').addEventListener('input', (event) => renderFoodChoices(event.target.value));
 $('#food-choices').addEventListener('click', (event) => { const choice = event.target.closest('[data-food-id]'); if (choice && !choice.disabled) addFoodToDay(choice.dataset.foodId, choice.dataset.foodType); });
