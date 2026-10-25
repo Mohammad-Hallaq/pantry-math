@@ -77,7 +77,7 @@ async function lookupBarcode(value) {
 }
 
 function renderProducts() {
-  const products = getProducts(); $('#product-count').textContent = `${products.length} saved`;
+  const products = getProducts().sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true })); $('#product-count').textContent = `${products.length} saved`;
   $('#products-list').innerHTML = products.length ? products.map((product) => `<button class="saved-card" data-product="${product.id}"><span class="card-kicker">${product.barcode ? 'Scanned product' : 'Manual food'}</span><strong>${escapeHtml(product.name)}</strong><small>${formatNutrition(productNutrition(product).calories, 'calories')} kcal / 100 g</small></button>`).join('') : '<div class="empty-state">No saved products yet. Scan a barcode or create one manually.</div>';
 }
 
@@ -161,7 +161,7 @@ function addProductToRecipe(product) {
 }
 
 function renderIngredientChoices(query = '') {
-  const products = getProducts().filter((product) => product.name.toLowerCase().includes(query.toLowerCase()));
+  const products = getProducts().filter((product) => product.name.toLowerCase().includes(query.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }));
   $('#ingredient-products').innerHTML = products.length ? products.map((product) => `<button type="button" data-select-product="${product.id}"><span><strong>${escapeHtml(product.name)}</strong><small>${formatNutrition(productNutrition(product).calories, 'calories')} kcal / 100 g</small></span><b>+</b></button>`).join('') : '<p class="empty-state small">No matching saved products.</p>';
 }
 
