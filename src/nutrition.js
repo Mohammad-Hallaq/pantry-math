@@ -7,6 +7,12 @@ export function roundToTwo(value) {
   return Math.round((number + Number.EPSILON) * 100) / 100;
 }
 
+export function isNutritionGoalMet(value, goal) {
+  const current = Number(value);
+  const target = Number(goal);
+  return Number.isFinite(current) && Number.isFinite(target) && target > 0 && current >= target;
+}
+
 export function calculateNetWeight(grossWeightG, containerWeightG) {
   const gross = Number(grossWeightG);
   const container = Number(containerWeightG);
