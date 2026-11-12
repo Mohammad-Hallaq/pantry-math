@@ -1,6 +1,6 @@
 import './style.css';
 import { BrowserMultiFormatReader } from '@zxing/browser';
-import { NUTRIENTS, EMPTY_NUTRITION, calculateNutritionForWeight, calculateServingNutrition, sumNutrition, calculateNutritionPer100g, calculatePortionNutrition, calculateNetWeight, formatNutrition, isValidNutrition, normalizeNutrition, roundToTwo } from './nutrition.js';
+import { NUTRIENTS, EMPTY_NUTRITION, calculateNutritionForWeight, calculateServingNutrition, sumNutrition, calculateNutritionPer100g, calculatePortionNutrition, calculateNetWeight, isNutritionGoalMet, formatNutrition, isValidNutrition, normalizeNutrition, roundToTwo } from './nutrition.js';
 import { getProducts, saveProduct, getProductByBarcode, productNutrition, getRecipes, saveRecipe, deleteRecipe, getDailyLog, saveDailyLog, getAllDailyLogs, getMonthlyArchives, saveMonthlyArchive, undoMonthlyArchive, createBackupData, restoreBackupData } from './storage.js';
 
 const $ = (selector) => document.querySelector(selector);
@@ -214,6 +214,51 @@ function dailyTotal() {
   return sumNutrition((activeDayLog?.items ?? []).map(dailyItemNutrition));
 }
 
+function renderDailyGoals(total) {
+  const goals = activeDayLog.goals ?? {};
+  let setCount = 0;
+  let metCount = 0;
+  NUTRIENTS.forEach((key) => {
+    const input = document.querySelector(`[data-goal="${key}"]`);
+    const card = document.querySelector(`[data-goal-card="${key}"]`);
+    const progress = card.querySelector('.goal-progress');
+    const goal = Number(goals[key]);
+    const hasGoal = Number.isFinite(goal) && goal > 0;
+    const met = hasGoal && isNutritionGoalMet(total[key], goal);
+    input.value = hasGoal ? roundToTwo(goal) : '';
+    card.classList.toggle('goal-met', met);
+    card.classList.toggle('goal-active', hasGoal && !met);
+    if (!hasGoal) {
+      progress.textContent = 'No goal set';
+      return;
+    }
+    setCount += 1;
+    if (met) metCount += 1;
+    progress.textContent = met
+      ? `Goal met ✓ · ${formatNutrition(total[key], key)} / ${formatNutrition(goal, key)}`
+      : `${formatNutrition(total[key], key)} / ${formatNutrition(goal, key)}`;
+  });
+  const status = $('#daily-goal-status');
+  status.classList.toggle('all-met', setCount > 0 && metCount === setCount);
+  status.textContent = !setCount ? 'Set any targets you want for this day.' : metCount === setCount ? 'All daily goals met ✓' : `${metCount} of ${setCount} goals met.`;
+}
+
+function copyYesterdayGoals() {
+  const date = new Date(`${activeDayLog.date}T12:00:00`);
+  date.setDate(date.getDate() - 1);
+  const yesterday = getDailyLog(localDateKey(date));
+  const goals = yesterday.goals ?? {};
+  const hasGoals = NUTRIENTS.some((key) => Number(goals[key]) > 0);
+  if (!hasGoals) {
+    $('#daily-goal-status').textContent = 'Yesterday has no goals to copy.';
+    return;
+  }
+  activeDayLog.goals = { ...goals };
+  saveDailyLog(activeDayLog);
+  renderDailyLog();
+  $('#daily-goal-status').textContent = 'Yesterday’s goals were copied to this day.';
+}
+
 function renderDailyLog() {
   const date = $('#log-date').value || localDateKey();
   if (!activeDayLog || activeDayLog.date !== date) activeDayLog = normalizeDailyLog(getDailyLog(date));
@@ -221,7 +266,9 @@ function renderDailyLog() {
   const isToday = date === localDateKey();
   const displayDate = new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
   $('#day-heading').textContent = isToday ? `Today · ${displayDate}` : displayDate;
-  $('#daily-totals').innerHTML = macroMarkup(dailyTotal());
+  const dayTotal = dailyTotal();
+  $('#daily-totals').innerHTML = macroMarkup(dayTotal);
+  renderDailyGoals(dayTotal);
   $('#meal-sections').innerHTML = activeDayLog.meals.length ? activeDayLog.meals.map((meal) => {
     const items = activeDayLog.items.filter((item) => item.mealId === meal.id);
     const total = sumNutrition(items.map(dailyItemNutrition));
@@ -502,6 +549,17 @@ $('#snack-close-camera').addEventListener('click', stopSnackScanner);
 $('#snack-lookup').addEventListener('click', () => lookupSnackBarcode($('#snack-barcode').value));
 $('#snack-barcode').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); lookupSnackBarcode(event.currentTarget.value); } });
 $('#manual-food-form').addEventListener('submit', (event) => { event.preventDefault(); saveManualFood(); });
+$('#daily-goal-grid').addEventListener('change', (event) => {
+  if (!event.target.classList.contains('daily-goal-input')) return;
+  const key = event.target.dataset.goal;
+  activeDayLog.goals = { ...(activeDayLog.goals ?? {}) };
+  const value = roundToTwo(event.target.value);
+  if (event.target.value === '' || value <= 0) delete activeDayLog.goals[key];
+  else activeDayLog.goals[key] = value;
+  saveDailyLog(activeDayLog);
+  renderDailyLog();
+});
+$('#copy-yesterday-goals').addEventListener('click', copyYesterdayGoals);
 $('#log-date').addEventListener('change', (event) => setLogDate(event.target.value));
 $('#previous-day').addEventListener('click', () => shiftLogDate(-1));
 $('#next-day').addEventListener('click', () => shiftLogDate(1));
