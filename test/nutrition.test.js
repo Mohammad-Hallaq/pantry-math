@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateNutritionForWeight, sumNutrition, calculateNutritionPer100g, calculatePortionNutrition, calculateNetWeight, calculateServingNutrition, normalizeNutrition, roundToTwo } from '../src/nutrition.js';
+import { calculateNutritionForWeight, sumNutrition, calculateNutritionPer100g, calculatePortionNutrition, calculateNetWeight, calculateServingNutrition, isNutritionGoalMet, normalizeNutrition, roundToTwo } from '../src/nutrition.js';
 
 const nutrition = (calories) => ({ calories, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 });
 
@@ -68,4 +68,11 @@ test('supports decimal quantities for repeated daily items', () => {
   const oneItem = nutrition(240);
   assert.equal(calculateNutritionForWeight(oneItem, 150).calories, 360);
   assert.equal(calculateNutritionForWeight(oneItem, 200).calories, 480);
+});
+
+test('marks a daily nutrition goal only when a positive target is reached', () => {
+  assert.equal(isNutritionGoalMet(120, 120), true);
+  assert.equal(isNutritionGoalMet(125, 120), true);
+  assert.equal(isNutritionGoalMet(119.99, 120), false);
+  assert.equal(isNutritionGoalMet(0, 0), false);
 });
